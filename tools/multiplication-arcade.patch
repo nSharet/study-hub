@@ -129,7 +129,7 @@ index 0000000..b25d078
 +FROM, OUT OF THE USE OR INABILITY TO USE THE FONT SOFTWARE OR FROM
 +OTHER DEALINGS IN THE FONT SOFTWARE.
 diff --git a/multiplication-arcade/src/App.tsx b/multiplication-arcade/src/App.tsx
-index d1c0340..d033a59 100644
+index d1c0340..fa86926 100644
 --- a/multiplication-arcade/src/App.tsx
 +++ b/multiplication-arcade/src/App.tsx
 @@ -1,5 +1,5 @@
@@ -145,7 +145,7 @@ index d1c0340..d033a59 100644
  import { GameShell } from "./screens/GameShell";
  
 +import { Wardrobe } from "./screens/Wardrobe";
-+import { buyOrEquip, loadWardrobe, saveWardrobe } from "./engine/rewards";
++import { equipOwned, loadWardrobe, openGift, saveWardrobe } from "./engine/rewards";
 +
  type Route =
    | { name: "home" }
@@ -168,7 +168,7 @@ index d1c0340..d033a59 100644
      saveStore(store);
    }, [store]);
  
-@@ -32,7 +39,12 @@ export function App() {
+@@ -32,7 +39,13 @@ export function App() {
  
    return (
      <div className="container">
@@ -177,12 +177,13 @@ index d1c0340..d033a59 100644
 +
 +      {route.name === "wardrobe" && <Wardrobe state={wardrobe}
 +        onHero={hero=>setWardrobe(previous=>({...previous,hero}))}
-+        onEquip={item=>setWardrobe(previous=>buyOrEquip(previous,item))}
++        onOpen={id=>setWardrobe(previous=>openGift(previous,id))}
++        onEquip={item=>setWardrobe(previous=>equipOwned(previous,item))}
 +        onBack={()=>go({name:"home"})} />}
  
        {route.name === "settings" && (
          <SettingsScreen
-@@ -40,7 +52,7 @@ export function App() {
+@@ -40,7 +53,7 @@ export function App() {
            onBack={() => go({ name: "home" })}
            onChange={onSettings}
            onReset={() => {
@@ -191,7 +192,7 @@ index d1c0340..d033a59 100644
              setStore(loadStore());
              go({ name: "home" });
            }}
-@@ -59,6 +71,8 @@ export function App() {
+@@ -59,6 +72,8 @@ export function App() {
          <GameShell
            store={store}
            gameId={route.gameId}
@@ -202,25 +203,77 @@ index d1c0340..d033a59 100644
            onGoHighScores={() => go({ name: "highscores" })}
 diff --git a/multiplication-arcade/src/engine/rewards.ts b/multiplication-arcade/src/engine/rewards.ts
 new file mode 100644
-index 0000000..29e4ec2
+index 0000000..679501a
 --- /dev/null
 +++ b/multiplication-arcade/src/engine/rewards.ts
-@@ -0,0 +1,40 @@
+@@ -0,0 +1,97 @@
 +export type Hero = "robot" | "fox";
++export type GiftKind = "skin" | "accessory";
++export type GiftId = `${GiftKind}-${number}`;
++
 +export const catalog = [
++  { id:"neon", name:"סקין ניאון", slot:"skin", cost:2, palette:["#9bff62","#278841","#e8ffab"] },
++  { id:"galaxy", name:"סקין גלקסיה", slot:"skin", cost:2, palette:["#ac79fa","#543ab4","#ffe18c"] },
++  { id:"lava", name:"סקין לבה", slot:"skin", cost:2, palette:["#ff7542","#a52c38","#ffdf7d"] },
++  { id:"frost", name:"סקין קרח", slot:"skin", cost:2, palette:["#99edff","#437ec2","#f1ffff"] },
++  { id:"jungle", name:"סקין ג׳ונגל", slot:"skin", cost:2, palette:["#75cc77","#256d55","#ddff87"] },
++  { id:"candy", name:"סקין ממתקים", slot:"skin", cost:2, palette:["#ff9dd9","#b94fa6","#fff6db"] },
++  { id:"ocean", name:"סקין מעמקים", slot:"skin", cost:2, palette:["#60c5fa","#2a4bad","#a8fff3"] },
++  { id:"sunset", name:"סקין שקיעה", slot:"skin", cost:2, palette:["#ffc063","#b8488b","#fff49a"] },
++  { id:"stealth", name:"סקין נינג׳ת לילה", slot:"skin", cost:2, palette:["#777892","#343350","#ff587e"] },
++  { id:"gold", name:"סקין זהב מלכותי", slot:"skin", cost:2, palette:["#ffe174","#a66a35","#fff7c6"] },
 +  { id:"crown", name:"כתר האלופים", slot:"head", cost:1 },
++  { id:"cap", name:"כובע סקייטר", slot:"head", cost:1 },
++  { id:"halo", name:"הילה זוהרת", slot:"head", cost:1 },
++  { id:"helmet", name:"קסדת אסטרונאוט", slot:"head", cost:1 },
 +  { id:"visor", name:"משקפי לייזר", slot:"face", cost:1 },
++  { id:"shades", name:"משקפי שמש", slot:"face", cost:1 },
++  { id:"goggles", name:"משקפי טייס", slot:"face", cost:1 },
++  { id:"mask", name:"מסכת גיבור", slot:"face", cost:1 },
 +  { id:"cape", name:"גלימת ברק", slot:"back", cost:1 },
++  { id:"wings", name:"כנפי מכונה", slot:"back", cost:1 },
++  { id:"jetpack", name:"תרמיל טילים", slot:"back", cost:1 },
++  { id:"scarf", name:"צעיף רוח", slot:"back", cost:1 },
 +  { id:"badge", name:"סמל הכפל", slot:"chest", cost:1 },
-+  { id:"neon", name:"סקין ניאון", slot:"skin", cost:2 },
-+  { id:"galaxy", name:"סקין גלקסיה", slot:"skin", cost:2 },
++  { id:"medal", name:"מדליית הזהב", slot:"chest", cost:1 },
++  { id:"bow", name:"עניבת פרפר", slot:"chest", cost:1 },
++  { id:"gem", name:"גביש כוח", slot:"chest", cost:1 },
++  { id:"shield", name:"מגן כוכב", slot:"hand", cost:1 },
++  { id:"wand", name:"שרביט ניצוצות", slot:"hand", cost:1 },
++  { id:"pad", name:"שלט ארקייד", slot:"hand", cost:1 },
++  { id:"balloon", name:"בלון חלל", slot:"hand", cost:1 },
 +] as const;
 +export type Item = typeof catalog[number];
 +export type Outfit = Partial<Record<Item["slot"], Item["id"]>>;
-+export type Wardrobe = { hero:Hero; credits:number; earned:number; owned:Item["id"][]; outfits:Record<Hero,Outfit> };
++export type Gift = { id:GiftId; kind:GiftKind; number:number; item:Item["id"] };
++export type Wardrobe = { hero:Hero; credits:number; earned:number; owned:Item["id"][]; outfits:Record<Hero,Outfit>; gifts:Gift[] };
 +const KEY="mul_arcade_wardrobe_v1";
-+export const emptyWardrobe=():Wardrobe=>({hero:"robot",credits:0,earned:0,owned:[],outfits:{robot:{},fox:{}}});
++export const giftCost=(kind:GiftKind)=>kind==="skin"?2:1;
++const itemKind=(item:Item):GiftKind=>item.slot==="skin"?"skin":"accessory";
 +
++function dealGifts():Gift[]{
++  return (["skin","accessory"] as const).flatMap(kind=>{
++    const items=catalog.filter(item=>itemKind(item)===kind);
++    for(let i=items.length-1;i>0;i--){
++      const j=Math.floor(Math.random()*(i+1));
++      [items[i],items[j]]=[items[j],items[i]];
++    }
++    return items.map((item,i)=>({id:`${kind}-${i+1}`,kind,number:i+1,item:item.id}));
++  });
++}
++export const emptyWardrobe=():Wardrobe=>({hero:"robot",credits:0,earned:0,owned:[],outfits:{robot:{},fox:{}},gifts:dealGifts()});
++function restoreGifts(data:unknown,fallback:Gift[]):Gift[]{
++  if(!Array.isArray(data)||data.length!==catalog.length)return fallback;
++  const byId=new Map(data.filter(g=>g&&typeof g.id==="string").map(g=>[g.id,g.item]));
++  const used=new Set<string>();
++  const gifts:Gift[]=[];
++  for(const gift of fallback){
++    const item=catalog.find(i=>i.id===byId.get(gift.id)&&itemKind(i)===gift.kind);
++    if(!item||used.has(item.id))return fallback;
++    used.add(item.id);gifts.push({...gift,item:item.id});
++  }
++  return gifts;
++}
 +export function roundCredits(accuracy:number):number {
 +  return !Number.isFinite(accuracy)||accuracy>100 ? 0 : accuracy>=95 ? 2 : accuracy>70 ? 1 : 0;
 +}
@@ -234,17 +287,22 @@ index 0000000..29e4ec2
 +    for(const hero of ["robot","fox"] as const)
 +      for(const item of catalog)
 +        if(owned.includes(item.id)&&s.outfits?.[hero]?.[item.slot]===item.id)outfits[hero][item.slot]=item.id;
-+    return {hero:s.hero==="fox"?"fox":"robot",credits:s.credits,earned:s.earned,owned,outfits};
++    return {hero:s.hero==="fox"?"fox":"robot",credits:s.credits,earned:s.earned,owned,outfits,gifts:restoreGifts(s.gifts,initial.gifts)};
 +  }catch{return initial;}
 +}
 +export function saveWardrobe(s:Wardrobe){try{localStorage.setItem(KEY,JSON.stringify(s));}catch{/* Play remains available. */}}
-+export function buyOrEquip(s:Wardrobe,item:Item):Wardrobe {
-+  const owned=s.owned.includes(item.id);
-+  if(!owned&&s.credits<item.cost)return s;
++
++export function openGift(s:Wardrobe,id:GiftId):Wardrobe {
++  const gift=s.gifts.find(g=>g.id===id);
++  if(!gift||s.owned.includes(gift.item)||s.credits<giftCost(gift.kind))return s;
++  return {...s,credits:s.credits-giftCost(gift.kind),owned:[...s.owned,gift.item]};
++}
++export function equipOwned(s:Wardrobe,item:Item):Wardrobe {
++  if(!s.owned.includes(item.id))return s;
 +  const outfit={...s.outfits[s.hero]};
 +  if(outfit[item.slot]===item.id)delete outfit[item.slot];
 +  else outfit[item.slot]=item.id;
-+  return {...s,credits:s.credits-(owned?0:item.cost),owned:owned?s.owned:[...s.owned,item.id],outfits:{...s.outfits,[s.hero]:outfit}};
++  return {...s,outfits:{...s.outfits,[s.hero]:outfit}};
 +}
 diff --git a/multiplication-arcade/src/engine/useGameClock.ts b/multiplication-arcade/src/engine/useGameClock.ts
 new file mode 100644
@@ -843,44 +901,90 @@ index 57a0835..8696882 100644
            <div key={c.id} style={{ gridColumn: "span 6" }}>
 diff --git a/multiplication-arcade/src/screens/Wardrobe.tsx b/multiplication-arcade/src/screens/Wardrobe.tsx
 new file mode 100644
-index 0000000..ea96e79
+index 0000000..4bef8f2
 --- /dev/null
 +++ b/multiplication-arcade/src/screens/Wardrobe.tsx
-@@ -0,0 +1,32 @@
-+import React, { useState } from "react";
-+import { catalog } from "../engine/rewards";
-+import type { Hero, Item, Wardrobe as WardrobeState } from "../engine/rewards";
+@@ -0,0 +1,78 @@
++import React, { useEffect, useRef, useState } from "react";
++import { catalog, giftCost } from "../engine/rewards";
++import type { GiftId, GiftKind, Hero, Item, Wardrobe as WardrobeState } from "../engine/rewards";
 +import { ArcadeHero, heroNames } from "../ui/ArcadeHero";
 +import { Button } from "../ui/Button";
 +
-+export function Wardrobe({state,onHero,onEquip,onBack}:{state:WardrobeState;onHero:(hero:Hero)=>void;onEquip:(item:Item)=>void;onBack:()=>void}){
-+  const [preview,setPreview]=useState<Item|null>(null);
++const kindNames:Record<GiftKind,string>={skin:"סקין",accessory:"אביזר"};
++const creditText=(n:number)=>n===1?"קרדיט אחד":`${n} קרדיטים`;
++function GiftArt({kind}:{kind:GiftKind}){
++  return <svg viewBox="0 0 72 68" width="64" height="60" aria-hidden="true">
++    <g stroke="#211e43" strokeWidth="3" strokeLinejoin="round">
++      <path d="M10 30h52v30H10z" fill={kind==="skin"?"#7854e6":"#2bb7bb"}/>
++      <path d="M7 24h58v12H7z" fill={kind==="skin"?"#a389ff":"#72f4df"}/>
++      <path d="M31 24h10v36H31z" fill="#ffd46f"/>
++      <path d="M36 24C4 24 16-2 36 24C56-2 68 24 36 24Z" fill="#ffeaa8"/>
++    </g>
++    <path d="M4 10h8M8 6v8m52 37h8m-4-4v8" stroke="#ffeaa8" strokeWidth="2" strokeLinecap="round"/>
++  </svg>;
++}
++export function Wardrobe({state,onHero,onOpen,onEquip,onBack}:{state:WardrobeState;onHero:(hero:Hero)=>void;onOpen:(id:GiftId)=>void;onEquip:(item:Item)=>void;onBack:()=>void}){
++  const [kind,setKind]=useState<GiftKind>("accessory");
++  const [view,setView]=useState<"gifts"|"collection">("gifts");
++  const [selected,setSelected]=useState<GiftId|null>(null);
++  const [notice,setNotice]=useState("");
++  const dialog=useRef<HTMLDialogElement>(null);
++  const opened=state.gifts.find(g=>g.id===selected&&state.owned.includes(g.item));
++  const revealed=opened&&catalog.find(item=>item.id===opened.item);
 +  const outfit=state.outfits[state.hero];
-+  const wearing=preview?{...outfit,[preview.slot]:preview.id}:outfit;
++  const gifts=state.gifts.filter(g=>!state.owned.includes(g.item));
++  const collection=catalog.filter(i=>state.owned.includes(i.id));
++  useEffect(()=>{
++    if(revealed&&dialog.current&&!dialog.current.open)dialog.current.showModal();
++  },[revealed]);
++  function closeReveal(){dialog.current?.close();setSelected(null);}
 +  return <>
 +    <div className="topbar"><h1 className="h1">הדמות והחנות</h1><Button variant="ghost" onClick={onBack}>חזרה למשחקים</Button></div>
 +    <section className="hero-panel">
-+      <div className="hero-stage"><ArcadeHero hero={state.hero} outfit={wearing}/><strong>{heroNames[state.hero]}</strong><span aria-live="polite">{preview?`תצוגה מקדימה: ${preview.name}`:"הדמות שלך"}</span></div>
++      <div className="hero-stage"><ArcadeHero hero={state.hero} outfit={outfit}/><strong>{heroNames[state.hero]}</strong><span>הדמות שלך</span></div>
 +      <div>
 +        <h2>מי משחק איתך?</h2>
-+        <div className="hero-choices">{(["robot","fox"] as const).map(hero=><button key={hero} className="hero-choice" aria-pressed={state.hero===hero} onClick={()=>{onHero(hero);setPreview(null);}}><ArcadeHero hero={hero}/><strong>{heroNames[hero]}</strong><span>{hero==="robot"?"רובוט הכפל":"שועל הרפתקן"}</span></button>)}</div>
++        <div className="hero-choices">{(["robot","fox"] as const).map(hero=><button key={hero} className="hero-choice" aria-pressed={state.hero===hero} onClick={()=>onHero(hero)}><ArcadeHero hero={hero}/><strong>{heroNames[hero]}</strong><span>{hero==="robot"?"רובוט הכפל":"שועל הרפתקן"}</span></button>)}</div>
 +        <p className="credit-badge" aria-live="polite">קרדיטים: {state.credits}</p>
 +      </div>
 +    </section>
-+    <h2>חנות המתנות</h2>
-+    {!state.earned?<p className="shop-note">החנות נפתחת אחרי משחקון שהסתיים בדיוק של יותר מ־70%. ב־95% ומעלה מרוויחים שני קרדיטים.</p>:<p className="shop-note">בחר פריט לתצוגה מקדימה. פריטים שקנית זמינים לשתי הדמויות.</p>}
-+    <div className="shop-grid">{catalog.map(item=>{
-+      const owned=state.owned.includes(item.id), equipped=outfit[item.slot]===item.id;
-+      return <article className="shop-card" key={item.id}>
-+        <strong>{item.name}</strong><span>{equipped?"על הדמות":owned?"באוסף שלך":`${item.cost} ${item.cost===1?"קרדיט":"קרדיטים"}`}</span>
-+        <Button variant="ghost" aria-pressed={preview?.id===item.id} onClick={()=>setPreview(preview?.id===item.id?null:item)}>תצוגה מקדימה</Button>
-+        <Button disabled={!owned&&state.credits<item.cost} onClick={()=>{onEquip(item);setPreview(null);}}>{equipped?"הסר":owned?"לבש":state.credits<item.cost?"חסרים קרדיטים":"קנה והלבש"}</Button>
-+      </article>;
-+    })}</div>
++    <div className="gift-switch" aria-label="תצוגת החנות">
++      <Button variant={view==="gifts"?"primary":"ghost"} aria-pressed={view==="gifts"} onClick={()=>{setView("gifts");setNotice("");}}>מתנות הפתעה</Button>
++      <Button variant={view==="collection"?"primary":"ghost"} aria-pressed={view==="collection"} onClick={()=>setView("collection")}>האוסף שלי ({collection.length}/30)</Button>
++    </div>
++    {view==="gifts"?<>
++      <h2>מתנות הפתעה</h2>
++      <p className="shop-note">בחר כל קופסה שתרצה. על הקופסה כתוב רק הסוג; מה בפנים מתגלה בפתיחה. אין פריטים כפולים.</p>
++      {!state.earned&&<p className="shop-note">כדי להרוויח קרדיטים, סיים משחקון בדיוק של יותר מ־70%.</p>}
++      <div className="gift-switch" aria-label="סוג המתנה">
++        <Button variant={kind==="accessory"?"primary":"ghost"} aria-pressed={kind==="accessory"} onClick={()=>{setKind("accessory");setNotice("");}}>אביזרים ({gifts.filter(g=>g.kind==="accessory").length})</Button>
++        <Button variant={kind==="skin"?"primary":"ghost"} aria-pressed={kind==="skin"} onClick={()=>{setKind("skin");setNotice("");}}>סקינים ({gifts.filter(g=>g.kind==="skin").length})</Button>
++      </div>
++      <p className="gift-status" role="status">{notice}</p>
++      <div className="gift-grid">{gifts.filter(g=>g.kind===kind).map(g=><button key={g.id} className="gift-box" data-kind={g.kind} onClick={()=>{
++        const cost=giftCost(g.kind);
++        if(state.credits<cost){setNotice(`לפתיחת מתנה ${g.number} צריך עוד ${creditText(cost-state.credits)}. שחק עוד סיבוב וצבור קרדיטים!`);return;}
++        setNotice("");setSelected(g.id);onOpen(g.id);
++      }}><GiftArt kind={g.kind}/><strong>{kindNames[g.kind]} · מתנה {g.number}</strong><span>{creditText(giftCost(g.kind))}</span></button>)}</div>
++      {!gifts.some(g=>g.kind===kind)&&<p className="shop-note">פתחת את כל המתנות מהסוג הזה. הפריטים מחכים לך באוסף!</p>}
++    </>:<>
++      <h2>האוסף שלי</h2>
++      {!collection.length?<p className="shop-note">עדיין אין פריטים באוסף. פתח מתנה כדי לגלות את הפריט הראשון שלך.</p>:<div className="shop-grid">{collection.map(item=>{
++        const equipped=outfit[item.slot]===item.id;
++        return <article className="shop-card" key={item.id}><strong>{item.name}</strong><span>{equipped?"על הדמות":"באוסף שלך"}</span><Button variant={equipped?"ghost":"primary"} onClick={()=>onEquip(item)}>{equipped?"הסר":"לבש"}</Button></article>;
++      })}</div>}
++    </>}
++    {revealed&&<dialog className="gift-reveal" ref={dialog} aria-labelledby="gift-reveal-title" onClose={()=>setSelected(null)}>
++      <div className="reveal-art"><ArcadeHero hero={state.hero} outfit={{...outfit,[revealed.slot]:revealed.id}}/></div>
++      <p>המתנה נפתחה!</p><h2 id="gift-reveal-title">{revealed.name}</h2>
++      <p>הפריט נוסף לאוסף שלך.</p>
++      <div className="gift-switch"><Button onClick={()=>{onEquip(revealed);closeReveal();}}>לבש עכשיו</Button><Button variant="ghost" onClick={closeReveal}>המשך לחנות</Button></div>
++    </dialog>}
 +  </>;
 +}
 diff --git a/multiplication-arcade/src/styles.css b/multiplication-arcade/src/styles.css
-index faaf8db..18ed1ed 100644
+index faaf8db..3f70285 100644
 --- a/multiplication-arcade/src/styles.css
 +++ b/multiplication-arcade/src/styles.css
 @@ -1,3 +1,19 @@
@@ -919,7 +1023,7 @@ index faaf8db..18ed1ed 100644
  a{ color:inherit; text-decoration:none; }
  .container{
    max-width: 980px;
-@@ -101,3 +119,22 @@ a{ color:inherit; text-decoration:none; }
+@@ -101,3 +119,38 @@ a{ color:inherit; text-decoration:none; }
    font-size: 13px;
    color: var(--muted);
  }
@@ -942,26 +1046,45 @@ index faaf8db..18ed1ed 100644
 +.shop-card button[disabled]{opacity:.48;cursor:not-allowed}.shop-card button[aria-pressed=true]{outline:2px solid #6df3ce}
 +.reward-note{display:flex;align-items:center;gap:12px;justify-content:space-between;flex-wrap:wrap;color:#ffe6a2;margin:0 0 12px}
 +@media(max-width:560px){.hero-panel{grid-template-columns:1fr}.hero-stage svg{max-width:180px}.shop-card{padding:9px}.shop-card button{padding:8px!important}}
++
++.gift-switch{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
++.gift-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(126px,1fr));gap:12px}
++.gift-box{display:grid;gap:4px;justify-items:center;align-content:center;min-height:136px;padding:10px 6px;border:1px solid #4ba39b;border-radius:18px;background:linear-gradient(150deg,#223f57,#172d43);color:var(--text);cursor:pointer;transition:transform .15s,box-shadow .15s}
++.gift-box[data-kind=skin]{border-color:#a98cfc;background:linear-gradient(150deg,#453979,#272a53)}
++.gift-box:hover{transform:translateY(-3px);box-shadow:0 7px 20px #03061688}
++.gift-box:focus-visible,.gift-switch button:focus-visible{outline:3px solid #ffe69c;outline-offset:3px}
++.gift-box span{color:#ffe6a2;font-size:.9rem}
++.gift-status{color:#ffe6a2;min-height:1.5em}
++.gift-reveal{width:min(370px,calc(100% - 28px));max-height:calc(100% - 28px);overflow:auto;text-align:center;background:linear-gradient(155deg,#292a55,#141a39);border:2px solid #a893ff;color:var(--text);border-radius:24px;padding:16px;box-shadow:var(--shadow)}
++.gift-reveal::backdrop{background:#080b1add}.gift-reveal p,.gift-reveal h2{margin:5px 0 10px}
++.reveal-art{width:min(100%,210px);margin:auto;animation:gift-pop .36s ease-out}
++@keyframes gift-pop{from{opacity:0;transform:scale(.68) rotate(-8deg)}to{opacity:1;transform:none}}
++@media(prefers-reduced-motion:reduce){.reveal-art{animation:none}.gift-box{transition:none}}
++.gift-status:empty{display:none}
++.gift-status:not(:empty){position:fixed;z-index:30;inset-inline:12px;bottom:12px;max-width:460px;margin:0 auto;padding:10px 16px;background:#3d2c44;border:1px solid #e1b468;border-radius:14px;box-shadow:var(--shadow);text-align:center}
 diff --git a/multiplication-arcade/src/ui/ArcadeHero.tsx b/multiplication-arcade/src/ui/ArcadeHero.tsx
 new file mode 100644
-index 0000000..178540b
+index 0000000..202921b
 --- /dev/null
 +++ b/multiplication-arcade/src/ui/ArcadeHero.tsx
-@@ -0,0 +1,39 @@
+@@ -0,0 +1,43 @@
 +import React from "react";
++import { catalog } from "../engine/rewards";
++import { BackGear, ChestGear, FaceGear, HandGear, HeadGear, SkinDecal } from "./HeroGear";
 +import type { Hero, Outfit } from "../engine/rewards";
 +
 +export const heroNames:Record<Hero,string>={robot:"פיקסל",fox:"ניצוץ"};
 +export function ArcadeHero({hero,outfit={}}:{hero:Hero;outfit?:Outfit}){
 +  const robot=hero==="robot";
-+  const main=outfit.skin==="neon"?"#9bff62":outfit.skin==="galaxy"?"#ac79fa":robot?"#39dbe5":"#ff9e45";
-+  const dark=outfit.skin==="neon"?"#278841":outfit.skin==="galaxy"?"#543ab4":robot?"#2187b5":"#d85d31";
++  const skin=catalog.find(item=>item.slot==="skin"&&item.id===outfit.skin);
++  const [main,dark,accent]=skin&&"palette" in skin?skin.palette:robot?["#39dbe5","#2187b5","#d8ffff"]:["#ff9e45","#d85d31","#fff1c9"];
 +  return <svg className="arcade-hero-art" viewBox="0 0 240 230" role="img" aria-label={heroNames[hero]}>
 +    <circle cx="120" cy="108" r="88" fill="#272853"/><circle cx="120" cy="108" r="75" fill="none" stroke="#6265a7" strokeWidth="2" strokeDasharray="6 8"/>
 +    <path d="M27 108h17m-8-8v16m159 25h16m-8-8v16M172 33h12m-6-6v12" stroke="#ffe17b" strokeWidth="4" strokeLinecap="round"/>
++    <SkinDecal skin={outfit.skin} color={accent}/>
 +    <ellipse cx="120" cy="207" rx="74" ry="11" fill="#080a1e" opacity=".65"/>
 +    <g stroke="#111530" strokeWidth="5" strokeLinejoin="round" strokeLinecap="round">
-+      {outfit.back&&<path d="M86 135Q65 156 56 196Q102 209 120 185Q142 199 184 191L155 132Z" fill="#f45286"/>}
++      <BackGear id={outfit.back}/>
 +      {!robot&&<path d="M150 171Q187 176 198 139Q223 177 196 199Q177 213 151 194Z" fill={main}/>}
 +      {!robot&&<path d="M198 139Q214 159 207 180L188 169Q194 157 198 139Z" fill="#fff1c9"/>}
 +      <path d="M89 173l-14 25q-2 8 10 8h24l7-25m13 0 5 25h25q11 0 6-10l-11-24" fill={dark}/>
@@ -973,19 +1096,89 @@ index 0000000..178540b
 +        <path d="M72 70Q77 59 92 58h58q17 2 22 16l6 50q0 17-18 21H82q-20-2-20-19Z" fill={main}/>
 +        <path d="M81 80h78q8 0 9 10l2 30q0 11-11 12H83q-10 0-10-11l2-30q1-11 6-11Z" fill="#22274c"/>
 +        <path d="M93 106l8-7 8 7m20 0 8-7 8 7m-37 10q11 12 24 0" fill="none" stroke="#aaffd8" strokeWidth="5"/>
-+        <path d="M83 70h38" stroke="#e9ffff" strokeWidth="4"/>
++        <path d="M83 70h38" stroke={accent} strokeWidth="4"/>
 +      </>:<><path d="M65 92L59 43q0-8 8-4l44 32m22-1 40-31q9-5 8 6l-7 52" fill={main}/>
 +        <path d="M72 79l-5-29 32 26m46-1 28-25-6 33" fill="#ff99a0" strokeWidth="3"/>
 +        <path d="M63 92q13-25 43-24l11-9 12 10q35-1 47 22l13 26-17 1 7 10-21 0q-12 23-38 24q-28 0-41-22l-18 0 6-10-17-2Z" fill={main}/>
-+        <path d="M59 115q37-14 60 15q25-27 61-14l-14 16q-23 17-47 19q-34-5-52-24Z" fill="#fff1c9" stroke="none"/>
++        <path d="M59 115q37-14 60 15q25-27 61-14l-14 16q-23 17-47 19q-34-5-52-24Z" fill={accent} stroke="none"/>
 +        <path d="M89 102l8 5 8-7m27 0 8 7 8-5" fill="none" strokeWidth="5"/>
 +        <path d="M112 120q8-6 15 0l-8 7Z" fill="#151934"/><path d="M120 128q7 6 13 0" fill="none" strokeWidth="3"/>
 +      </>}
-+      {outfit.chest?<path d="M121 151l5 8 9 2-6 7 1 9-9-5-9 5 1-9-7-7 10-2Z" fill="#ffe16c" strokeWidth="3"/>:<path d="M114 159h14m-7-7v14" stroke="#fff1c9" strokeWidth="4"/>}
-+      {outfit.face&&<path d="M79 92l31 3 10 7 11-7 31-3-5 22-23 3-14-8-14 8-23-3Z" fill="#d34fff" strokeWidth="4"/>}
-+      {outfit.head&&<path d="M87 66l-7-30 23 15 17-24 18 24 22-15-6 30Z" fill="#ffd757"/>}
++      <ChestGear id={outfit.chest}/>
++      <FaceGear id={outfit.face}/>
++      <HeadGear id={outfit.head}/>
++      <HandGear id={outfit.hand}/>
 +    </g>
 +  </svg>;
++}
+diff --git a/multiplication-arcade/src/ui/HeroGear.tsx b/multiplication-arcade/src/ui/HeroGear.tsx
+new file mode 100644
+index 0000000..24adfe8
+--- /dev/null
++++ b/multiplication-arcade/src/ui/HeroGear.tsx
+@@ -0,0 +1,63 @@
++import React from "react";
++import type { Outfit } from "../engine/rewards";
++
++export function BackGear({id}:{id:Outfit["back"]}){
++  switch(id){
++    case "cape":return <><path d="M86 135Q65 156 56 196Q102 209 120 185Q142 199 184 191L155 132Z" fill="#f45286"/><path d="M68 186l12-18 4 12 13-8" fill="none" stroke="#ffe06b" strokeWidth="3"/></>;
++    case "wings":return <path d="M95 143Q64 111 28 123l15 11-7 7 18 9-6 9 31 12m66-28q31-32 67-20l-15 11 7 7-18 9 6 9-31 12" fill="#a1d8ff"/>;
++    case "jetpack":return <><path d="M69 164l-6 37 13-12 9 16 2-35m62 0 6 35 10-15 11 11-3-35" fill="#ff9048"/><rect x="63" y="133" width="24" height="45" rx="8" fill="#a2a5dd"/><rect x="153" y="133" width="24" height="45" rx="8" fill="#a2a5dd"/><path d="M65 151h20m70 0h20" stroke="#fff5b9" strokeWidth="4"/></>;
++    case "scarf":return <path d="M80 140q33 8 72-4l24 5q18 8 38 5l-14 15q-25 1-47-11l-9 6q-43 8-66-3Z" fill="#f8586f"/>;
++    default:return null;
++  }
++}
++export function HeadGear({id}:{id:Outfit["head"]}){
++  switch(id){
++    case "crown":return <path d="M87 66l-7-30 23 15 17-24 18 24 22-15-6 30Z" fill="#ffd757"/>;
++    case "cap":return <><path d="M81 67q-2-30 33-34q34-3 46 21l-2 11Z" fill="#fd5c87"/><path d="M117 65q34-17 65-8q14 6-5 11l-43 8Z" fill="#d5a7ff"/><path d="M115 39q13 6 16 19" fill="none" stroke="#fff0d6" strokeWidth="3"/></>;
++    case "halo":return <ellipse cx="120" cy="35" rx="34" ry="10" fill="none" stroke="#ffe873" strokeWidth="7"/>;
++    case "helmet":return <><path d="M68 91Q52 61 74 40q20-18 46-17 29 0 47 18 19 19 8 50l-10-4q7-22-9-34-16-13-36-13-22 0-39 14-13 13-3 32Z" fill="#e6f5ff"/><path d="M103 32h35" stroke="#90daed" strokeWidth="4"/></>;
++    default:return null;
++  }
++}
++export function FaceGear({id}:{id:Outfit["face"]}){
++  switch(id){
++    case "visor":return <path d="M79 92l31 3 10 7 11-7 31-3-5 22-23 3-14-8-14 8-23-3Z" fill="#d34fff" strokeWidth="4"/>;
++    case "shades":return <><path d="M78 95h35l-4 18H88Zm49 0h35l-10 18h-21Zm-14 3h14" fill="#282643" strokeWidth="4"/><path d="M89 99l12 2m36-2 12 2" stroke="#77e9ff" strokeWidth="3"/></>;
++    case "goggles":return <><path d="M79 103h82" fill="none" stroke="#9c624b" strokeWidth="7"/><circle cx="100" cy="103" r="13" fill="#fed080"/><circle cx="140" cy="103" r="13" fill="#fed080"/><path d="M96 100l6-3m34 3 6-3" stroke="#fff" strokeWidth="3"/></>;
++    case "mask":return <><path d="M78 90q20 7 42 8 19 0 42-8l-5 24q-26 14-37 1-14 13-38-1Z" fill="#f56355"/><path d="M90 103h16m28 0h16" stroke="#fff8d9" strokeWidth="5"/></>;
++    default:return null;
++  }
++}
++export function ChestGear({id}:{id:Outfit["chest"]}){
++  switch(id){
++    case "badge":return <path d="M121 151l5 8 9 2-6 7 1 9-9-5-9 5 1-9-7-7 10-2Z" fill="#ffe16c" strokeWidth="3"/>;
++    case "medal":return <><path d="M109 147l12 14 11-14" fill="none" stroke="#ff586e" strokeWidth="5"/><circle cx="121" cy="169" r="8" fill="#ffd35c" strokeWidth="3"/></>;
++    case "bow":return <path d="M121 158l-14-6v16l14-6 14 6v-16Z" fill="#fe75bb" strokeWidth="3"/>;
++    case "gem":return <path d="M121 151l11 7-3 14-8 6-8-6-3-14Z" fill="#8dffeb" strokeWidth="3"/>;
++    default:return <path d="M114 159h14m-7-7v14" stroke="#fff1c9" strokeWidth="4"/>;
++  }
++}
++export function HandGear({id}:{id:Outfit["hand"]}){
++  switch(id){
++    case "shield":return <><path d="M166 141l18-4 17 7-4 25-14 11-14-11Z" fill="#8a74ff" strokeWidth="4"/><path d="M183 146l3 7 7 1-5 4 2 7-7-4-6 4 1-7-5-4 7-1Z" fill="#ffe180" strokeWidth="2"/></>;
++    case "wand":return <><path d="M174 169l24-32" stroke="#fff5c1" strokeWidth="5"/><path d="M199 127l4 5 7 1-5 4 1 7-7-3-5 3 1-7-5-4 7-1Z" fill="#ff91d9" strokeWidth="3"/></>;
++    case "pad":return <><rect x="160" y="145" width="42" height="24" rx="8" fill="#655ac5" strokeWidth="3"/><path d="M167 156h10m-5-5v10m15-7h1m5 5h1" fill="none" stroke="#faffaf" strokeWidth="3"/></>;
++    case "balloon":return <><path d="M183 153q18-15 15-40" fill="none" stroke="#fff7d6" strokeWidth="2"/><ellipse cx="199" cy="96" rx="15" ry="19" fill="#ff7aae" strokeWidth="3"/><path d="M194 86l-2 8" stroke="#ffe7ef" strokeWidth="3"/></>;
++    default:return null;
++  }
++}
++export function SkinDecal({skin,color}:{skin:Outfit["skin"];color:string}){
++  const pattern:Record<string,string>={
++    neon:"M31 158l15-23-3 13h11l-16 21 3-11Z",
++    galaxy:"M32 143l5 11 11 5-11 4-5 11-4-11-11-4 11-5Zm19-12h11m-6-6v12",
++    lava:"M26 172q-7-12 4-20q1 8 7 5q6-7 2-18 17 12 11 25-5 14-24 8Z",
++    frost:"M35 140v33m-14-25 28 17m0-17-28 17m9-20 5 5 5-5m-10 23 5-5 5 5",
++    jungle:"M22 168q3-24 29-26-1 27-26 27m1 6 17-22",
++    candy:"M25 154l-8-7v20l8-7m20-6 8-7v20l-8-7M25 157a10 10 0 1 0 20 0 10 10 0 0 0-20 0",
++    ocean:"M20 149q7-7 14 0t14 0m-28 10q7-7 14 0t14 0m-28 10q7-7 14 0t14 0",
++    sunset:"M23 157a13 13 0 0 1 26 0Zm-5 6h36m-31 8h26",
++    stealth:"M18 145l18 14-18 14m16-28 18 14-18 14",
++    gold:"M36 140l5 12 13 1-10 8 3 13-11-7-11 7 3-13-10-8 13-1Z",
++  };
++  return skin&&pattern[skin]?<path d={pattern[skin]} fill="none" stroke={color} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>:null;
 +}
 diff --git a/multiplication-arcade/src/ui/RoundReward.tsx b/multiplication-arcade/src/ui/RoundReward.tsx
 new file mode 100644
