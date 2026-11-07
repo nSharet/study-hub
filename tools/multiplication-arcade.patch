@@ -129,17 +129,60 @@ index 0000000..b25d078
 +FROM, OUT OF THE USE OR INABILITY TO USE THE FONT SOFTWARE OR FROM
 +OTHER DEALINGS IN THE FONT SOFTWARE.
 diff --git a/multiplication-arcade/src/App.tsx b/multiplication-arcade/src/App.tsx
-index d1c0340..033aded 100644
+index d1c0340..d033a59 100644
 --- a/multiplication-arcade/src/App.tsx
 +++ b/multiplication-arcade/src/App.tsx
 @@ -1,5 +1,5 @@
- import React, { useMemo, useState } from "react";
+-import React, { useMemo, useState } from "react";
 -import { loadStore, saveStore, updateSettings } from "./engine/storage";
++import React, { useEffect, useState } from "react";
 +import { loadStore, resetProgress, saveStore, updateSettings } from "./engine/storage";
  import { GameId, Store } from "./types";
  import { Home } from "./screens/Home";
  import { SettingsScreen } from "./screens/Settings";
-@@ -40,7 +40,7 @@ export function App() {
+@@ -7,19 +7,26 @@ import { HighScores } from "./screens/HighScores";
+ import { Progress } from "./screens/Progress";
+ import { GameShell } from "./screens/GameShell";
+ 
++import { Wardrobe } from "./screens/Wardrobe";
++import { buyOrEquip, loadWardrobe, saveWardrobe } from "./engine/rewards";
++
+ type Route =
+   | { name: "home" }
+   | { name: "settings" }
+   | { name: "highscores" }
+   | { name: "progress" }
++  | { name: "wardrobe" }
+   | { name: "game"; gameId: GameId };
+ 
+ export function App() {
+   const [store, setStore] = useState<Store>(() => loadStore());
+   const [route, setRoute] = useState<Route>({ name: "home" });
+ 
++  const [wardrobe, setWardrobe] = useState(loadWardrobe);
++  useEffect(() => saveWardrobe(wardrobe), [wardrobe]);
++
+   // Persist store on change
+-  useMemo(() => {
++  useEffect(() => {
+     saveStore(store);
+   }, [store]);
+ 
+@@ -32,7 +39,12 @@ export function App() {
+ 
+   return (
+     <div className="container">
+-      {route.name === "home" && <Home store={store} onGo={go} />}
++      {route.name === "home" && <Home store={store} onGo={go} wardrobe={wardrobe} />}
++
++      {route.name === "wardrobe" && <Wardrobe state={wardrobe}
++        onHero={hero=>setWardrobe(previous=>({...previous,hero}))}
++        onEquip={item=>setWardrobe(previous=>buyOrEquip(previous,item))}
++        onBack={()=>go({name:"home"})} />}
+ 
+       {route.name === "settings" && (
+         <SettingsScreen
+@@ -40,7 +52,7 @@ export function App() {
            onBack={() => go({ name: "home" })}
            onChange={onSettings}
            onReset={() => {
@@ -148,6 +191,566 @@ index d1c0340..033aded 100644
              setStore(loadStore());
              go({ name: "home" });
            }}
+@@ -59,6 +71,8 @@ export function App() {
+         <GameShell
+           store={store}
+           gameId={route.gameId}
++          onEarn={credits=>setWardrobe(previous=>({...previous,credits:previous.credits+credits,earned:previous.earned+credits}))}
++          onShop={()=>go({name:"wardrobe"})}
+           onStore={setStore}
+           onExit={() => go({ name: "home" })}
+           onGoHighScores={() => go({ name: "highscores" })}
+diff --git a/multiplication-arcade/src/engine/rewards.ts b/multiplication-arcade/src/engine/rewards.ts
+new file mode 100644
+index 0000000..29e4ec2
+--- /dev/null
++++ b/multiplication-arcade/src/engine/rewards.ts
+@@ -0,0 +1,40 @@
++export type Hero = "robot" | "fox";
++export const catalog = [
++  { id:"crown", name:"כתר האלופים", slot:"head", cost:1 },
++  { id:"visor", name:"משקפי לייזר", slot:"face", cost:1 },
++  { id:"cape", name:"גלימת ברק", slot:"back", cost:1 },
++  { id:"badge", name:"סמל הכפל", slot:"chest", cost:1 },
++  { id:"neon", name:"סקין ניאון", slot:"skin", cost:2 },
++  { id:"galaxy", name:"סקין גלקסיה", slot:"skin", cost:2 },
++] as const;
++export type Item = typeof catalog[number];
++export type Outfit = Partial<Record<Item["slot"], Item["id"]>>;
++export type Wardrobe = { hero:Hero; credits:number; earned:number; owned:Item["id"][]; outfits:Record<Hero,Outfit> };
++const KEY="mul_arcade_wardrobe_v1";
++export const emptyWardrobe=():Wardrobe=>({hero:"robot",credits:0,earned:0,owned:[],outfits:{robot:{},fox:{}}});
++
++export function roundCredits(accuracy:number):number {
++  return !Number.isFinite(accuracy)||accuracy>100 ? 0 : accuracy>=95 ? 2 : accuracy>70 ? 1 : 0;
++}
++export function loadWardrobe():Wardrobe {
++  const initial=emptyWardrobe();
++  try{
++    const s=JSON.parse(localStorage.getItem(KEY)||"null");
++    if(!s||!Number.isSafeInteger(s.credits)||s.credits<0||!Number.isSafeInteger(s.earned)||s.earned<s.credits)return initial;
++    const owned=catalog.filter(i=>Array.isArray(s.owned)&&s.owned.includes(i.id)).map(i=>i.id);
++    const outfits=initial.outfits;
++    for(const hero of ["robot","fox"] as const)
++      for(const item of catalog)
++        if(owned.includes(item.id)&&s.outfits?.[hero]?.[item.slot]===item.id)outfits[hero][item.slot]=item.id;
++    return {hero:s.hero==="fox"?"fox":"robot",credits:s.credits,earned:s.earned,owned,outfits};
++  }catch{return initial;}
++}
++export function saveWardrobe(s:Wardrobe){try{localStorage.setItem(KEY,JSON.stringify(s));}catch{/* Play remains available. */}}
++export function buyOrEquip(s:Wardrobe,item:Item):Wardrobe {
++  const owned=s.owned.includes(item.id);
++  if(!owned&&s.credits<item.cost)return s;
++  const outfit={...s.outfits[s.hero]};
++  if(outfit[item.slot]===item.id)delete outfit[item.slot];
++  else outfit[item.slot]=item.id;
++  return {...s,credits:s.credits-(owned?0:item.cost),owned:owned?s.owned:[...s.owned,item.id],outfits:{...s.outfits,[s.hero]:outfit}};
++}
+diff --git a/multiplication-arcade/src/engine/useGameClock.ts b/multiplication-arcade/src/engine/useGameClock.ts
+new file mode 100644
+index 0000000..6d84e00
+--- /dev/null
++++ b/multiplication-arcade/src/engine/useGameClock.ts
+@@ -0,0 +1,12 @@
++import { useEffect, useLayoutEffect, useRef } from "react";
++import { nowMs } from "./time";
++
++export function useGameClock(active:boolean,onTick:(now:number)=>void){
++  const latest=useRef(onTick);
++  useLayoutEffect(()=>{latest.current=onTick;});
++  useEffect(()=>{
++    if(!active)return;
++    const timer=window.setInterval(()=>latest.current(nowMs()),50);
++    return ()=>window.clearInterval(timer);
++  },[active]);
++}
+diff --git a/multiplication-arcade/src/games/ComboClimb.tsx b/multiplication-arcade/src/games/ComboClimb.tsx
+index 13babdd..be7083d 100644
+--- a/multiplication-arcade/src/games/ComboClimb.tsx
++++ b/multiplication-arcade/src/games/ComboClimb.tsx
+@@ -1,4 +1,5 @@
+-import React, { useEffect, useRef, useState } from "react";
++import { useGameClock } from "../engine/useGameClock";
++import React, { useRef, useState } from "react";
+ import { Store } from "../types";
+ import { Card } from "../ui/Card";
+ import { TimerRing } from "../ui/TimerRing";
+@@ -41,7 +42,7 @@ export function ComboClimb({
+   onGoHighScores: () => void;
+   onPlayAgain: () => void;
+ }) {
+-  const [running, setRunning] = useState(true);
++
+   const [sessionLeft, setSessionLeft] = useState(SESSION_MS);
+   const [qLeft, setQLeft] = useState(Q_LIMIT_MS);
+ 
+@@ -63,18 +64,24 @@ export function ComboClimb({
+   const [summary, setSummary] = useState<SummaryData | null>(null);
+ 
+   const qStartRef = useRef(nowMs());
++  const deadline=useRef(nowMs()+SESSION_MS);
++  const pending=useRef(false);
++  const ended=useRef(false);
+ 
+   const nextQuestion = (updated: Store, nextLevel: number) => {
+     setQ(pickByLevel(updated, nextLevel));
+     setInput("");
++    pending.current=false;
+     setQLeft(Q_LIMIT_MS);
+     qStartRef.current = nowMs();
+   };
+ 
+   const endSession = () => {
+-    setRunning(false);
++    if(ended.current)return;
++    ended.current=true;
++
+ 
+-    const accuracy = asked ? Math.round((correct / asked) * 100) : 0;
++    const accuracy = asked ? (correct / asked) * 100 : 0;
+     const avgMs = asked ? Math.round(sumMs / asked) : 0;
+ 
+     const newHigh = isNewTop10(store, "comboClimb", score);
+@@ -97,8 +104,9 @@ export function ComboClimb({
+   };
+ 
+   const submit = (timedOut = false) => {
+-    if (!running) return;
+ 
++    if(ended.current||pending.current)return;
++    pending.current=true;
+     const at = nowMs();
+     const ms = at - qStartRef.current;
+     const ans = Number(input);
+@@ -143,29 +151,16 @@ export function ComboClimb({
+     }
+   };
+ 
+-  useEffect(() => {
+-    const id = window.setInterval(() => {
+-      if (!running) return;
+-
+-      setSessionLeft(ms => {
+-        if (ms <= 50) {
+-          endSession();
+-          return 0;
+-        }
+-        return ms - 50;
+-      });
+-
+-      setQLeft(ms => {
+-        if (ms <= 50) {
+-          submit(true);
+-          return Q_LIMIT_MS;
+-        }
+-        return ms - 50;
+-      });
+-    }, 50);
+-
+-    return () => window.clearInterval(id);
+-  }, [running, input, q.answer]);
++  useGameClock(!summary, now=>{
++    if(ended.current)return;
++    const remaining=Math.max(0,deadline.current-now);
++    setSessionLeft(remaining);
++    if(!remaining){endSession();return;}
++    if(pending.current)return;
++    const questionRemaining=Math.max(0,Q_LIMIT_MS-(now-qStartRef.current));
++    setQLeft(questionRemaining);
++    if(!questionRemaining)submit(true);
++  });
+ 
+   return (
+     <>
+diff --git a/multiplication-arcade/src/games/FindMistake.tsx b/multiplication-arcade/src/games/FindMistake.tsx
+index a4faad0..997b1c1 100644
+--- a/multiplication-arcade/src/games/FindMistake.tsx
++++ b/multiplication-arcade/src/games/FindMistake.tsx
+@@ -1,4 +1,5 @@
+-import React, { useEffect, useMemo, useRef, useState } from "react";
++import { useGameClock } from "../engine/useGameClock";
++import React, { useMemo, useRef, useState } from "react";
+ import { Store } from "../types";
+ import { Card } from "../ui/Card";
+ import { Button } from "../ui/Button";
+@@ -38,6 +39,7 @@ export function FindMistake({
+   const [summary, setSummary] = useState<SummaryData | null>(null);
+ 
+   const setStartRef = useRef(nowMs());
++  const pending=useRef(false);
+ 
+   const rows = useMemo(() => {
+     // 6 rows, exactly one wrong
+@@ -58,76 +60,53 @@ export function FindMistake({
+     return r;
+   }, [store, setIndex]);
+ 
+-  const nextSet = () => {
++  const nextSet = (updated:Store, nextAsked:number, nextCorrect:number, nextScore:number) => {
+     if (setIndex + 1 >= TOTAL_SETS) {
+-      const accuracy = asked ? Math.round((correct / asked) * 100) : 0;
+-      const newHigh = isNewTop10(store, "findMistake", score);
+-      const next = addHighScore(store, "findMistake", score, Date.now(), `דיוק ${accuracy}%`);
++      const accuracy = nextAsked ? (nextCorrect / nextAsked) * 100 : 0;
++      const newHigh = isNewTop10(updated, "findMistake", nextScore);
++      const next = addHighScore(updated, "findMistake", nextScore, Date.now(), `דיוק ${accuracy}%`);
+       onStore(next);
+ 
+       setSummary({
+         title: "נגמר! 🕵️",
+-        score,
++        score:nextScore,
+         accuracyPct: accuracy,
+         durationSec: Math.ceil((TOTAL_SETS * SET_TIME_MS) / 1000),
+         extraLines: [
+           { label: "סטים", value: `${TOTAL_SETS}/${TOTAL_SETS}` },
+-          { label: "נכונות", value: `${correct}/${asked}` },
++          { label: "נכונות", value: `${nextCorrect}/${nextAsked}` },
+         ],
+         isNewHighScore: newHigh,
+       });
+       return;
+     }
+ 
++    pending.current=false;
+     setSetIndex(i => i + 1);
+     setLeft(SET_TIME_MS);
+     setStartRef.current = nowMs();
+   };
+ 
+   const choose = (row: Row, timedOut = false) => {
+-    if (summary) return;
+-
+-    const ms = nowMs() - setStartRef.current;
+-    const ok = !timedOut && row.isWrong;
+-
+-    const updated = recordAnswer(store, row.key, ok, Math.min(ms, 4000), nowMs());
+-    onStore(updated);
+-
+-    setAsked(x => x + 1);
+-    if (ok) setCorrect(x => x + 1);
+-
+-    if (ok) {
+-      const pts = Math.max(60, 260 - Math.floor(ms / 55));
+-      setScore(s => s + pts);
+-      setToast({ kind: "good", text: `נכון! +${pts}` });
+-      setTimeout(() => {
+-        setToast(null);
+-        nextSet();
+-      }, 650);
+-    } else {
+-      setToast({ kind: "bad", text: timedOut ? "נגמר הזמן! ממשיכים…" : "לא זה… ממשיכים" });
+-      setTimeout(() => {
+-        setToast(null);
+-        nextSet();
+-      }, 650);
+-    }
++    if(summary||pending.current)return;
++    pending.current=true;
++    const ms=nowMs()-setStartRef.current;
++    const ok=!timedOut&&row.isWrong;
++    const updated=recordAnswer(store,row.key,ok,Math.min(ms,4000),nowMs());
++    const nextAsked=asked+1,nextCorrect=correct+(ok?1:0);
++    const pts=ok?Math.max(60,260-Math.floor(ms/55)):0;
++    const nextScore=score+pts;
++    onStore(updated);setAsked(nextAsked);setCorrect(nextCorrect);setScore(nextScore);
++    setToast(ok?{kind:"good",text:`נכון! +${pts}`}:{kind:"bad",text:timedOut?"נגמר הזמן! ממשיכים…":"לא זה… ממשיכים"});
++    setTimeout(()=>{setToast(null);nextSet(updated,nextAsked,nextCorrect,nextScore);},650);
+   };
+ 
+-  useEffect(() => {
+-    const id = window.setInterval(() => {
+-      if (summary) return;
+-
+-      setLeft(ms => {
+-        if (ms <= 50) {
+-          choose(rows[0], true);
+-          return 0;
+-        }
+-        return ms - 50;
+-      });
+-    }, 50);
+-
+-    return () => window.clearInterval(id);
+-  }, [rows, summary]);
++  useGameClock(!summary,now=>{
++    if(pending.current)return;
++    const remaining=Math.max(0,SET_TIME_MS-(now-setStartRef.current));
++    setLeft(remaining);
++    if(!remaining)choose(rows[0],true);
++  });
+ 
+   return (
+     <>
+diff --git a/multiplication-arcade/src/games/MatchPairs.tsx b/multiplication-arcade/src/games/MatchPairs.tsx
+index 46d52a1..13b80ca 100644
+--- a/multiplication-arcade/src/games/MatchPairs.tsx
++++ b/multiplication-arcade/src/games/MatchPairs.tsx
+@@ -42,8 +42,8 @@ export function MatchPairs({
+ 
+     while (chosen.length < 6 && guard++ < 300) {
+       const q = pickQuestion(store);
+-      if (seen.has(q.key)) continue;
+-      seen.add(q.key);
++      if (seen.has(String(q.answer))) continue;
++      seen.add(String(q.answer));
+       chosen.push(q);
+     }
+ 
+@@ -91,7 +91,7 @@ export function MatchPairs({
+ 
+         setTimeout(() => setOpen([]), 300);
+ 
+-        if (newMatched.size === 6) {
++        if (newMatched.size === tiles.length/2) {
+           const elapsed = nowMs() - startedAt; // ms
+           const durationSec = Math.ceil(elapsed / 1000);
+ 
+@@ -111,10 +111,11 @@ export function MatchPairs({
+           setSummary({
+             title: "כל הכבוד! 🧩",
+             score,
++            accuracyPct: (newMatched.size / (moves + 1)) * 100,
+             durationSec,
+             extraLines: [
+               { label: "מהלכים", value: String(moves + 1) },
+-              { label: "זוגות", value: "6/6" },
++              { label: "זוגות", value: `${newMatched.size}/${tiles.length/2}` },
+             ],
+             isNewHighScore: newHigh,
+           });
+diff --git a/multiplication-arcade/src/games/QuickChoice.tsx b/multiplication-arcade/src/games/QuickChoice.tsx
+index bd86782..d894afd 100644
+--- a/multiplication-arcade/src/games/QuickChoice.tsx
++++ b/multiplication-arcade/src/games/QuickChoice.tsx
+@@ -1,3 +1,4 @@
++import { useGameClock } from "../engine/useGameClock";
+ import React, { useEffect, useRef, useState } from "react";
+ import { Store } from "../types";
+ import { Card } from "../ui/Card";
+@@ -40,11 +41,15 @@ export function QuickChoice({
+   const [summary, setSummary] = useState<SummaryData | null>(null);
+ 
+   const qStart = useRef(nowMs());
++  const deadline=useRef(nowMs()+SESSION_MS);
++  const pending=useRef(false);
++  const ended=useRef(false);
+ 
+   const nextQ = (s: Store) => {
+     const nq = pickQuestion(s);
+     setQ(nq);
+     setOptions(shuffle([nq.answer, ...makeTraps(nq.answer)]));
++    pending.current=false;
+     setQLeft(Q_LIMIT_MS);
+     qStart.current = nowMs();
+   };
+@@ -54,7 +59,9 @@ export function QuickChoice({
+   }, []);
+ 
+   const finish = () => {
+-    const acc = asked ? Math.round((correct / asked) * 100) : 0;
++    if(ended.current)return;
++    ended.current=true;
++    const acc = asked ? (correct / asked) * 100 : 0;
+     const newHigh = isNewTop10(store, "quickChoice", score);
+     const next = addHighScore(store, "quickChoice", score, Date.now(), `דיוק ${acc}%`);
+     onStore(next);
+@@ -69,6 +76,8 @@ export function QuickChoice({
+   };
+ 
+   const choose = (opt?: number, timeout = false) => {
++    if(ended.current||pending.current)return;
++    pending.current=true;
+     const ms = nowMs() - qStart.current;
+     const ok = !timeout && opt === q.answer;
+ 
+@@ -96,25 +105,16 @@ export function QuickChoice({
+     }
+   };
+ 
+-  useEffect(() => {
+-    const id = setInterval(() => {
+-      setSessionLeft(ms => {
+-        if (ms <= 50) {
+-          finish();
+-          return 0;
+-        }
+-        return ms - 50;
+-      });
+-      setQLeft(ms => {
+-        if (ms <= 50) {
+-          choose(undefined, true);
+-          return Q_LIMIT_MS;
+-        }
+-        return ms - 50;
+-      });
+-    }, 50);
+-    return () => clearInterval(id);
+-  }, [q]);
++  useGameClock(!summary, now=>{
++    if(ended.current)return;
++    const remaining=Math.max(0,deadline.current-now);
++    setSessionLeft(remaining);
++    if(!remaining){finish();return;}
++    if(pending.current)return;
++    const questionRemaining=Math.max(0,Q_LIMIT_MS-(now-qStart.current));
++    setQLeft(questionRemaining);
++    if(!questionRemaining)choose(undefined, true);
++  });
+ 
+   return (
+     <>
+diff --git a/multiplication-arcade/src/games/Sprint60.tsx b/multiplication-arcade/src/games/Sprint60.tsx
+index c9014c1..9c3e890 100644
+--- a/multiplication-arcade/src/games/Sprint60.tsx
++++ b/multiplication-arcade/src/games/Sprint60.tsx
+@@ -1,4 +1,5 @@
+-import React, { useEffect, useRef, useState } from "react";
++import { useGameClock } from "../engine/useGameClock";
++import React, { useRef, useState } from "react";
+ import { Store } from "../types";
+ import { Card } from "../ui/Card";
+ import { TimerRing } from "../ui/TimerRing";
+@@ -26,7 +27,7 @@ export function Sprint60({
+   onGoHighScores: () => void;
+   onPlayAgain: () => void;
+ }) {
+-  const [running, setRunning] = useState(true);
++
+   const [sessionLeft, setSessionLeft] = useState(SESSION_MS);
+   const [qLeft, setQLeft] = useState(Q_LIMIT_MS);
+   const [q, setQ] = useState(() => pickQuestion(store));
+@@ -43,18 +44,24 @@ export function Sprint60({
+   const [summary, setSummary] = useState<SummaryData | null>(null);
+ 
+   const qStartRef = useRef(nowMs());
++  const deadline=useRef(nowMs()+SESSION_MS);
++  const pending=useRef(false);
++  const ended=useRef(false);
+ 
+   const nextQuestion = (updatedStore: Store) => {
+     setQ(pickQuestion(updatedStore));
+     setInput("");
++    pending.current=false;
+     setQLeft(Q_LIMIT_MS);
+     qStartRef.current = nowMs();
+   };
+ 
+   const endSession = () => {
+-    setRunning(false);
++    if(ended.current)return;
++    ended.current=true;
++
+ 
+-    const accuracy = asked ? Math.round((correct / asked) * 100) : 0;
++    const accuracy = asked ? (correct / asked) * 100 : 0;
+     const avgMs = asked ? Math.round(sumMs / asked) : 0;
+     const newHigh = isNewTop10(store, "sprint60", score);
+ 
+@@ -76,8 +83,9 @@ export function Sprint60({
+   };
+ 
+   const submit = (timedOut = false) => {
+-    if (!running) return;
+ 
++    if(ended.current||pending.current)return;
++    pending.current=true;
+     const at = nowMs();
+     const ms = at - qStartRef.current;
+     const ans = Number(input);
+@@ -109,29 +117,16 @@ export function Sprint60({
+     }
+   };
+ 
+-  useEffect(() => {
+-    const id = window.setInterval(() => {
+-      if (!running) return;
+-
+-      setSessionLeft(ms => {
+-        if (ms <= 50) {
+-          endSession();
+-          return 0;
+-        }
+-        return ms - 50;
+-      });
+-
+-      setQLeft(ms => {
+-        if (ms <= 50) {
+-          submit(true);
+-          return Q_LIMIT_MS;
+-        }
+-        return ms - 50;
+-      });
+-    }, 50);
+-
+-    return () => clearInterval(id);
+-  }, [running, input]);
++  useGameClock(!summary, now=>{
++    if(ended.current)return;
++    const remaining=Math.max(0,deadline.current-now);
++    setSessionLeft(remaining);
++    if(!remaining){endSession();return;}
++    if(pending.current)return;
++    const questionRemaining=Math.max(0,Q_LIMIT_MS-(now-qStartRef.current));
++    setQLeft(questionRemaining);
++    if(!questionRemaining)submit(true);
++  });
+ 
+   return (
+     <>
+diff --git a/multiplication-arcade/src/screens/GameShell.tsx b/multiplication-arcade/src/screens/GameShell.tsx
+index ca5107e..6e65ba0 100644
+--- a/multiplication-arcade/src/screens/GameShell.tsx
++++ b/multiplication-arcade/src/screens/GameShell.tsx
+@@ -8,6 +8,8 @@ import { MatchPairs } from "../games/MatchPairs";
+ import { ComboClimb } from "../games/ComboClimb";
+ import { FindMistake } from "../games/FindMistake";
+ 
++import { RoundReward } from "../ui/RoundReward";
++
+ const title: Record<GameId, string> = {
+   sprint60: "⚡ ספרינט 60",
+   quickChoice: "🎯 פגיעה בול",
+@@ -22,12 +24,16 @@ export function GameShell({
+   onStore,
+   onExit,
+   onGoHighScores,
++  onEarn,
++  onShop,
+ }: {
+   store: Store;
+   gameId: GameId;
+   onStore: (s: Store) => void;
+   onExit: () => void;
+   onGoHighScores: () => void;
++  onEarn: (credits:number) => void;
++  onShop: () => void;
+ }) {
+   // Changing seed remounts the game component => clean "Play again" without reload
+   const [seed, setSeed] = useState(1);
+@@ -39,7 +45,7 @@ export function GameShell({
+       <div className="topbar">
+         <div className="brand">
+           <div style={{ fontWeight: 900, fontSize: 20 }}>{title[gameId]}</div>
+-          <div className="badge">טיימר לשאלה: 4 שניות • טווח: {store.settings.rangeMode}</div>
++          <div className="badge">{gameId === "matchPairs" ? "התאמה בקצב שלך" : gameId === "findMistake" ? "12 שניות לסט" : "4 שניות לתרגיל"} • טווח: {store.settings.rangeMode}</div>
+         </div>
+         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+           <Button variant="ghost" onClick={onPlayAgain}>
+@@ -69,11 +75,13 @@ export function GameShell({
+     <>
+       {header}
+ 
++      <RoundReward key={seed} onEarn={onEarn} onShop={onShop}>
+       {gameId === "sprint60" && <Sprint60 key={seed} {...commonProps} />}
+       {gameId === "quickChoice" && <QuickChoice key={seed} {...commonProps} />}
+       {gameId === "matchPairs" && <MatchPairs key={seed} {...commonProps} />}
+       {gameId === "comboClimb" && <ComboClimb key={seed} {...commonProps} />}
+       {gameId === "findMistake" && <FindMistake key={seed} {...commonProps} />}
++      </RoundReward>
+     </>
+   );
+ }
 diff --git a/multiplication-arcade/src/screens/HighScores.tsx b/multiplication-arcade/src/screens/HighScores.tsx
 index da620be..6189b73 100644
 --- a/multiplication-arcade/src/screens/HighScores.tsx
@@ -201,8 +804,83 @@ index da620be..6189b73 100644
 +    </>
 +  );
  }
+diff --git a/multiplication-arcade/src/screens/Home.tsx b/multiplication-arcade/src/screens/Home.tsx
+index 57a0835..8696882 100644
+--- a/multiplication-arcade/src/screens/Home.tsx
++++ b/multiplication-arcade/src/screens/Home.tsx
+@@ -3,7 +3,10 @@ import { Store, GameId } from "../types";
+ import { Card } from "../ui/Card";
+ import { Button } from "../ui/Button";
+ 
+-export function Home({ store, onGo }: { store: Store; onGo: (r: any) => void }) {
++import { ArcadeHero, heroNames } from "../ui/ArcadeHero";
++import type { Wardrobe } from "../engine/rewards";
++
++export function Home({ store, onGo, wardrobe }: { store: Store; onGo: (r: any) => void; wardrobe:Wardrobe }) {
+   const cards: Array<{ id: GameId; title: string; desc: string; tag: string }> = [
+     { id: "sprint60", title: "⚡ ספרינט 60", desc: "כמה שיותר תרגילים ב־60 שניות", tag: "מהיר" },
+     { id: "quickChoice", title: "🎯 פגיעה בול", desc: "4 תשובות — לבחור מהר", tag: "בחירה" },
+@@ -23,7 +26,7 @@ export function Home({ store, onGo }: { store: Store; onGo: (r: any) => void })
+           }} />
+           <div>
+             <div className="h1">לוח כפל – משחקונים</div>
+-            <div className="badge">זמן תגובה מקסימלי: 4 שניות • טווח: {store.settings.rangeMode}</div>
++            <div className="badge">טווח תרגול: {store.settings.rangeMode}</div>
+           </div>
+         </div>
+ 
+@@ -34,6 +37,11 @@ export function Home({ store, onGo }: { store: Store; onGo: (r: any) => void })
+         </div>
+       </div>
+ 
++      <section className="hero-banner">
++        <ArcadeHero hero={wardrobe.hero} outfit={wardrobe.outfits[wardrobe.hero]}/>
++        <div><strong>{heroNames[wardrobe.hero]}</strong><div className="small">קרדיטים: {wardrobe.credits}</div></div>
++        <Button onClick={()=>onGo({name:"wardrobe"})}>{wardrobe.earned?"הדמות והחנות":"בחירת דמות"}</Button>
++      </section>
+       <div className="grid">
+         {cards.map(c => (
+           <div key={c.id} style={{ gridColumn: "span 6" }}>
+diff --git a/multiplication-arcade/src/screens/Wardrobe.tsx b/multiplication-arcade/src/screens/Wardrobe.tsx
+new file mode 100644
+index 0000000..ea96e79
+--- /dev/null
++++ b/multiplication-arcade/src/screens/Wardrobe.tsx
+@@ -0,0 +1,32 @@
++import React, { useState } from "react";
++import { catalog } from "../engine/rewards";
++import type { Hero, Item, Wardrobe as WardrobeState } from "../engine/rewards";
++import { ArcadeHero, heroNames } from "../ui/ArcadeHero";
++import { Button } from "../ui/Button";
++
++export function Wardrobe({state,onHero,onEquip,onBack}:{state:WardrobeState;onHero:(hero:Hero)=>void;onEquip:(item:Item)=>void;onBack:()=>void}){
++  const [preview,setPreview]=useState<Item|null>(null);
++  const outfit=state.outfits[state.hero];
++  const wearing=preview?{...outfit,[preview.slot]:preview.id}:outfit;
++  return <>
++    <div className="topbar"><h1 className="h1">הדמות והחנות</h1><Button variant="ghost" onClick={onBack}>חזרה למשחקים</Button></div>
++    <section className="hero-panel">
++      <div className="hero-stage"><ArcadeHero hero={state.hero} outfit={wearing}/><strong>{heroNames[state.hero]}</strong><span aria-live="polite">{preview?`תצוגה מקדימה: ${preview.name}`:"הדמות שלך"}</span></div>
++      <div>
++        <h2>מי משחק איתך?</h2>
++        <div className="hero-choices">{(["robot","fox"] as const).map(hero=><button key={hero} className="hero-choice" aria-pressed={state.hero===hero} onClick={()=>{onHero(hero);setPreview(null);}}><ArcadeHero hero={hero}/><strong>{heroNames[hero]}</strong><span>{hero==="robot"?"רובוט הכפל":"שועל הרפתקן"}</span></button>)}</div>
++        <p className="credit-badge" aria-live="polite">קרדיטים: {state.credits}</p>
++      </div>
++    </section>
++    <h2>חנות המתנות</h2>
++    {!state.earned?<p className="shop-note">החנות נפתחת אחרי משחקון שהסתיים בדיוק של יותר מ־70%. ב־95% ומעלה מרוויחים שני קרדיטים.</p>:<p className="shop-note">בחר פריט לתצוגה מקדימה. פריטים שקנית זמינים לשתי הדמויות.</p>}
++    <div className="shop-grid">{catalog.map(item=>{
++      const owned=state.owned.includes(item.id), equipped=outfit[item.slot]===item.id;
++      return <article className="shop-card" key={item.id}>
++        <strong>{item.name}</strong><span>{equipped?"על הדמות":owned?"באוסף שלך":`${item.cost} ${item.cost===1?"קרדיט":"קרדיטים"}`}</span>
++        <Button variant="ghost" aria-pressed={preview?.id===item.id} onClick={()=>setPreview(preview?.id===item.id?null:item)}>תצוגה מקדימה</Button>
++        <Button disabled={!owned&&state.credits<item.cost} onClick={()=>{onEquip(item);setPreview(null);}}>{equipped?"הסר":owned?"לבש":state.credits<item.cost?"חסרים קרדיטים":"קנה והלבש"}</Button>
++      </article>;
++    })}</div>
++  </>;
++}
 diff --git a/multiplication-arcade/src/styles.css b/multiplication-arcade/src/styles.css
-index faaf8db..5a0ecd7 100644
+index faaf8db..18ed1ed 100644
 --- a/multiplication-arcade/src/styles.css
 +++ b/multiplication-arcade/src/styles.css
 @@ -1,3 +1,19 @@
@@ -241,3 +919,137 @@ index faaf8db..5a0ecd7 100644
  a{ color:inherit; text-decoration:none; }
  .container{
    max-width: 980px;
+@@ -101,3 +119,22 @@ a{ color:inherit; text-decoration:none; }
+   font-size: 13px;
+   color: var(--muted);
+ }
++
++.hero-banner,.hero-panel{background:linear-gradient(145deg,#171f45,#211b43);border:1px solid #404872;border-radius:22px;padding:14px;margin:14px 0;box-shadow:var(--shadow)}
++.hero-banner{display:flex;gap:14px;align-items:center;flex-wrap:wrap}
++.hero-banner .arcade-hero-art{width:88px;height:84px}
++.hero-banner strong{font-size:1.35rem}
++.hero-banner button{margin-inline-start:auto}
++.hero-panel{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;align-items:center}
++.arcade-hero-art{width:100%;height:auto;display:block}
++.hero-stage{text-align:center;display:grid;justify-items:center;gap:4px}
++.hero-stage svg{max-width:240px}.hero-stage strong{font-size:1.6rem}
++.hero-stage span,.shop-note{color:var(--muted)}
++.hero-choices,.shop-grid{display:grid;gap:10px;grid-template-columns:repeat(2,minmax(0,1fr))}
++.hero-choice,.shop-card{border:1px solid #4c547b;border-radius:16px;background:#151f39;color:var(--text);padding:12px;display:grid;gap:6px;align-content:start}
++.hero-choice{cursor:pointer;justify-items:center}.hero-choice[aria-pressed=true]{border:2px solid #6df3ce;background:#26395a}
++.hero-choice svg{max-width:120px}.hero-choice strong{font-size:1.1rem}.hero-choice span,.shop-card span{color:var(--muted)}
++.credit-badge{display:inline-block;background:#614728;color:#ffe6a2;border-radius:30px;padding:7px 14px;font-weight:800}
++.shop-card button[disabled]{opacity:.48;cursor:not-allowed}.shop-card button[aria-pressed=true]{outline:2px solid #6df3ce}
++.reward-note{display:flex;align-items:center;gap:12px;justify-content:space-between;flex-wrap:wrap;color:#ffe6a2;margin:0 0 12px}
++@media(max-width:560px){.hero-panel{grid-template-columns:1fr}.hero-stage svg{max-width:180px}.shop-card{padding:9px}.shop-card button{padding:8px!important}}
+diff --git a/multiplication-arcade/src/ui/ArcadeHero.tsx b/multiplication-arcade/src/ui/ArcadeHero.tsx
+new file mode 100644
+index 0000000..178540b
+--- /dev/null
++++ b/multiplication-arcade/src/ui/ArcadeHero.tsx
+@@ -0,0 +1,39 @@
++import React from "react";
++import type { Hero, Outfit } from "../engine/rewards";
++
++export const heroNames:Record<Hero,string>={robot:"פיקסל",fox:"ניצוץ"};
++export function ArcadeHero({hero,outfit={}}:{hero:Hero;outfit?:Outfit}){
++  const robot=hero==="robot";
++  const main=outfit.skin==="neon"?"#9bff62":outfit.skin==="galaxy"?"#ac79fa":robot?"#39dbe5":"#ff9e45";
++  const dark=outfit.skin==="neon"?"#278841":outfit.skin==="galaxy"?"#543ab4":robot?"#2187b5":"#d85d31";
++  return <svg className="arcade-hero-art" viewBox="0 0 240 230" role="img" aria-label={heroNames[hero]}>
++    <circle cx="120" cy="108" r="88" fill="#272853"/><circle cx="120" cy="108" r="75" fill="none" stroke="#6265a7" strokeWidth="2" strokeDasharray="6 8"/>
++    <path d="M27 108h17m-8-8v16m159 25h16m-8-8v16M172 33h12m-6-6v12" stroke="#ffe17b" strokeWidth="4" strokeLinecap="round"/>
++    <ellipse cx="120" cy="207" rx="74" ry="11" fill="#080a1e" opacity=".65"/>
++    <g stroke="#111530" strokeWidth="5" strokeLinejoin="round" strokeLinecap="round">
++      {outfit.back&&<path d="M86 135Q65 156 56 196Q102 209 120 185Q142 199 184 191L155 132Z" fill="#f45286"/>}
++      {!robot&&<path d="M150 171Q187 176 198 139Q223 177 196 199Q177 213 151 194Z" fill={main}/>}
++      {!robot&&<path d="M198 139Q214 159 207 180L188 169Q194 157 198 139Z" fill="#fff1c9"/>}
++      <path d="M89 173l-14 25q-2 8 10 8h24l7-25m13 0 5 25h25q11 0 6-10l-11-24" fill={dark}/>
++      <path d="M81 147q-23-8-30 17q-3 11 8 14q13 4 24-12m74-17q16-17 29-4q10 11-2 21l-19 10" fill={main}/>
++      <path d="M83 144q39-19 75 0l7 34q-46 18-89 0Z" fill={main}/>
++      <path d="M89 159h62l6 17q-35 13-73 0Z" fill={dark} stroke="none"/>
++      {robot?<><path d="M120 60l-2-23" fill="none"/><circle cx="118" cy="31" r="9" fill="#ffe071"/>
++        <rect x="52" y="88" width="24" height="35" rx="9" fill={dark}/><rect x="165" y="88" width="24" height="35" rx="9" fill={dark}/>
++        <path d="M72 70Q77 59 92 58h58q17 2 22 16l6 50q0 17-18 21H82q-20-2-20-19Z" fill={main}/>
++        <path d="M81 80h78q8 0 9 10l2 30q0 11-11 12H83q-10 0-10-11l2-30q1-11 6-11Z" fill="#22274c"/>
++        <path d="M93 106l8-7 8 7m20 0 8-7 8 7m-37 10q11 12 24 0" fill="none" stroke="#aaffd8" strokeWidth="5"/>
++        <path d="M83 70h38" stroke="#e9ffff" strokeWidth="4"/>
++      </>:<><path d="M65 92L59 43q0-8 8-4l44 32m22-1 40-31q9-5 8 6l-7 52" fill={main}/>
++        <path d="M72 79l-5-29 32 26m46-1 28-25-6 33" fill="#ff99a0" strokeWidth="3"/>
++        <path d="M63 92q13-25 43-24l11-9 12 10q35-1 47 22l13 26-17 1 7 10-21 0q-12 23-38 24q-28 0-41-22l-18 0 6-10-17-2Z" fill={main}/>
++        <path d="M59 115q37-14 60 15q25-27 61-14l-14 16q-23 17-47 19q-34-5-52-24Z" fill="#fff1c9" stroke="none"/>
++        <path d="M89 102l8 5 8-7m27 0 8 7 8-5" fill="none" strokeWidth="5"/>
++        <path d="M112 120q8-6 15 0l-8 7Z" fill="#151934"/><path d="M120 128q7 6 13 0" fill="none" strokeWidth="3"/>
++      </>}
++      {outfit.chest?<path d="M121 151l5 8 9 2-6 7 1 9-9-5-9 5 1-9-7-7 10-2Z" fill="#ffe16c" strokeWidth="3"/>:<path d="M114 159h14m-7-7v14" stroke="#fff1c9" strokeWidth="4"/>}
++      {outfit.face&&<path d="M79 92l31 3 10 7 11-7 31-3-5 22-23 3-14-8-14 8-23-3Z" fill="#d34fff" strokeWidth="4"/>}
++      {outfit.head&&<path d="M87 66l-7-30 23 15 17-24 18 24 22-15-6 30Z" fill="#ffd757"/>}
++    </g>
++  </svg>;
++}
+diff --git a/multiplication-arcade/src/ui/RoundReward.tsx b/multiplication-arcade/src/ui/RoundReward.tsx
+new file mode 100644
+index 0000000..c426dba
+--- /dev/null
++++ b/multiplication-arcade/src/ui/RoundReward.tsx
+@@ -0,0 +1,11 @@
++import React,{createContext,useRef} from "react";
++
++export const RoundRewardContext=createContext<{award:(credits:number)=>void;shop:()=>void}|null>(null);
++export function RoundReward({onEarn,onShop,children}:{onEarn:(credits:number)=>void;onShop:()=>void;children:React.ReactNode}){
++  const awarded=useRef(false);
++  return <RoundRewardContext.Provider value={{award(credits){
++    if(!credits||awarded.current)return;
++    awarded.current=true;
++    onEarn(credits);
++  },shop:onShop}}>{children}</RoundRewardContext.Provider>;
++}
+diff --git a/multiplication-arcade/src/ui/SummaryModal.tsx b/multiplication-arcade/src/ui/SummaryModal.tsx
+index 492a3b0..bf81bcb 100644
+--- a/multiplication-arcade/src/ui/SummaryModal.tsx
++++ b/multiplication-arcade/src/ui/SummaryModal.tsx
+@@ -1,4 +1,6 @@
+-import React from "react";
++import React, { useContext, useEffect } from "react";
++import { roundCredits } from "../engine/rewards";
++import { RoundRewardContext } from "./RoundReward";
+ import { Card } from "./Card";
+ import { Button } from "./Button";
+ 
+@@ -24,6 +26,9 @@ export function SummaryModal({
+   onGoHighScores: () => void;
+ }) {
+   const accuracy = typeof data.accuracyPct === "number" ? data.accuracyPct : undefined;
++  const reward=useContext(RoundRewardContext);
++  const earned=roundCredits(accuracy??0);
++  useEffect(()=>{reward?.award(earned);},[earned,reward]);
+   const avg = typeof data.avgResponseMs === "number" ? data.avgResponseMs : undefined;
+ 
+   return (
+@@ -36,6 +41,7 @@ export function SummaryModal({
+         placeItems: "center",
+         padding: 16,
+         zIndex: 50,
++        overflowY: "auto",
+       }}
+     >
+       <div style={{ width: "min(720px, 96vw)" }}>
+@@ -68,7 +74,7 @@ export function SummaryModal({
+             {typeof accuracy === "number" && (
+               <div className="row">
+                 <div className="small">דיוק</div>
+-                <div style={{ fontWeight: 900 }}>{accuracy}%</div>
++                <div style={{ fontWeight: 900 }}>{Number(accuracy.toFixed(2))}%</div>
+               </div>
+             )}
+ 
+@@ -95,6 +101,9 @@ export function SummaryModal({
+           </div>
+ 
+           <div className="hr" />
++          {reward&&<div className="reward-note">
++            {earned?<><strong>הרווחת {earned===1?"קרדיט אחד":"שני קרדיטים"}!</strong><Button onClick={reward.shop}>לחנות המתנות ←</Button></>:<span>במשחקון הבא, יותר מ־70% דיוק יזכו אותך בקרדיט.</span>}
++          </div>}
+ 
+           <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "space-between" }}>
+             <Button variant="ghost" onClick={onGoHome}>
