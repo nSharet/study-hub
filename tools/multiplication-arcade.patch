@@ -203,10 +203,10 @@ index d1c0340..fa86926 100644
            onGoHighScores={() => go({ name: "highscores" })}
 diff --git a/multiplication-arcade/src/engine/rewards.ts b/multiplication-arcade/src/engine/rewards.ts
 new file mode 100644
-index 0000000..03532fe
+index 0000000..8775af9
 --- /dev/null
 +++ b/multiplication-arcade/src/engine/rewards.ts
-@@ -0,0 +1,98 @@
+@@ -0,0 +1,109 @@
 +export type Hero = "robot" | "fox";
 +export type GiftKind = "skin" | "accessory";
 +export type GiftId = `${GiftKind}-${number}`;
@@ -250,6 +250,17 @@ index 0000000..03532fe
 +const KEY="mul_arcade_wardrobe_v1";
 +export const CREDIT_MIN_ACCURACY=75;
 +export const DOUBLE_CREDIT_MIN_ACCURACY=95;
++export const SPRINT_CREDIT_TIERS=[
++  { correct:12, credits:8 },
++  { correct:8, credits:5 },
++  { correct:7, credits:2 },
++  { correct:6, credits:1 },
++] as const;
++
++export function sprintCredits(correct:number):number {
++  if(!Number.isSafeInteger(correct))return 0;
++  return SPRINT_CREDIT_TIERS.find(tier=>correct>=tier.correct)?.credits??0;
++}
 +const itemKind=(item:Item):GiftKind=>item.slot==="skin"?"skin":"accessory";
 +
 +function dealGifts():Gift[]{
@@ -660,7 +671,7 @@ index bd86782..d894afd 100644
    return (
      <>
 diff --git a/multiplication-arcade/src/games/Sprint60.tsx b/multiplication-arcade/src/games/Sprint60.tsx
-index c9014c1..9c3e890 100644
+index c9014c1..d7a94f9 100644
 --- a/multiplication-arcade/src/games/Sprint60.tsx
 +++ b/multiplication-arcade/src/games/Sprint60.tsx
 @@ -1,4 +1,5 @@
@@ -670,7 +681,19 @@ index c9014c1..9c3e890 100644
  import { Store } from "../types";
  import { Card } from "../ui/Card";
  import { TimerRing } from "../ui/TimerRing";
-@@ -26,7 +27,7 @@ export function Sprint60({
+@@ -10,7 +11,10 @@ import { basePointsFromMs, comboMultiplier } from "../engine/scoring";
+ import { addHighScore, recordAnswer } from "../engine/storage";
+ import { isNewTop10 } from "../engine/highscoreUtil";
+ 
+-const Q_LIMIT_MS = 4000;
++import { SPRINT_CREDIT_TIERS } from "../engine/rewards";
++
++export const SPRINT_QUESTION_SECONDS = 5;
++const Q_LIMIT_MS = SPRINT_QUESTION_SECONDS * 1000;
+ const SESSION_MS = 60000;
+ 
+ export function Sprint60({
+@@ -26,7 +30,7 @@ export function Sprint60({
    onGoHighScores: () => void;
    onPlayAgain: () => void;
  }) {
@@ -679,7 +702,7 @@ index c9014c1..9c3e890 100644
    const [sessionLeft, setSessionLeft] = useState(SESSION_MS);
    const [qLeft, setQLeft] = useState(Q_LIMIT_MS);
    const [q, setQ] = useState(() => pickQuestion(store));
-@@ -43,18 +44,24 @@ export function Sprint60({
+@@ -43,18 +47,24 @@ export function Sprint60({
    const [summary, setSummary] = useState<SummaryData | null>(null);
  
    const qStartRef = useRef(nowMs());
@@ -706,18 +729,32 @@ index c9014c1..9c3e890 100644
      const avgMs = asked ? Math.round(sumMs / asked) : 0;
      const newHigh = isNewTop10(store, "sprint60", score);
  
-@@ -76,8 +83,9 @@ export function Sprint60({
+@@ -65,6 +75,7 @@ export function Sprint60({
+       title: "כל הכבוד! 🎉",
+       score,
+       accuracyPct: accuracy,
++      sprintCorrectAnswers: correct,
+       avgResponseMs: avgMs,
+       durationSec: 60,
+       extraLines: [
+@@ -76,12 +87,14 @@ export function Sprint60({
    };
  
    const submit = (timedOut = false) => {
 -    if (!running) return;
  
 +    if(ended.current||pending.current)return;
-+    pending.current=true;
      const at = nowMs();
++    if(at>=deadline.current){endSession();return;}
++    pending.current=true;
      const ms = at - qStartRef.current;
      const ans = Number(input);
-@@ -109,29 +117,16 @@ export function Sprint60({
+-    const ok = !timedOut && ans === q.answer;
++    const ok = !timedOut && ms < Q_LIMIT_MS && ans === q.answer;
+ 
+     const updated = recordAnswer(store, q.key, ok, Math.min(ms, Q_LIMIT_MS), at);
+     onStore(updated);
+@@ -109,29 +122,16 @@ export function Sprint60({
      }
    };
  
@@ -757,11 +794,32 @@ index c9014c1..9c3e890 100644
  
    return (
      <>
+@@ -139,9 +139,13 @@ export function Sprint60({
+         <div className="row">
+           <div className="pill">ניקוד: {score}</div>
+           <div className="pill">קומבו: {streak}</div>
++          <div className="pill">תשובות נכונות: {correct}</div>
+           <div className="pill">זמן: {Math.ceil(sessionLeft / 1000)}s</div>
+         </div>
+ 
++        <p className="small">יעדי קרדיטים לפי תשובות נכונות: {SPRINT_CREDIT_TIERS.slice().reverse().map(({correct,credits})=>(
++          <React.Fragment key={correct}>{correct===6?"":" · "}<bdi>{correct} = {credits}</bdi></React.Fragment>
++        ))}</p>
+         <div className="hr" />
+ 
+         <div style={{ display: "grid", placeItems: "center", gap: 12 }}>
 diff --git a/multiplication-arcade/src/screens/GameShell.tsx b/multiplication-arcade/src/screens/GameShell.tsx
-index ca5107e..6e65ba0 100644
+index ca5107e..9d736b6 100644
 --- a/multiplication-arcade/src/screens/GameShell.tsx
 +++ b/multiplication-arcade/src/screens/GameShell.tsx
-@@ -8,6 +8,8 @@ import { MatchPairs } from "../games/MatchPairs";
+@@ -2,12 +2,14 @@ import React, { useMemo, useState } from "react";
+ import { GameId, Store } from "../types";
+ import { Button } from "../ui/Button";
+ 
+-import { Sprint60 } from "../games/Sprint60";
++import { Sprint60, SPRINT_QUESTION_SECONDS } from "../games/Sprint60";
+ import { QuickChoice } from "../games/QuickChoice";
+ import { MatchPairs } from "../games/MatchPairs";
  import { ComboClimb } from "../games/ComboClimb";
  import { FindMistake } from "../games/FindMistake";
  
@@ -792,7 +850,7 @@ index ca5107e..6e65ba0 100644
          <div className="brand">
            <div style={{ fontWeight: 900, fontSize: 20 }}>{title[gameId]}</div>
 -          <div className="badge">טיימר לשאלה: 4 שניות • טווח: {store.settings.rangeMode}</div>
-+          <div className="badge">{gameId === "matchPairs" ? "התאמה בקצב שלך" : gameId === "findMistake" ? "12 שניות לסט" : "4 שניות לתרגיל"} • טווח: {store.settings.rangeMode}</div>
++          <div className="badge">{gameId === "matchPairs" ? "התאמה בקצב שלך" : gameId === "findMistake" ? "12 שניות לסט" : gameId === "sprint60" ? `${SPRINT_QUESTION_SECONDS} שניות לתרגיל` : "4 שניות לתרגיל"} • טווח: {store.settings.rangeMode}</div>
          </div>
          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
            <Button variant="ghost" onClick={onPlayAgain}>
@@ -902,7 +960,7 @@ index 57a0835..8696882 100644
            <div key={c.id} style={{ gridColumn: "span 6" }}>
 diff --git a/multiplication-arcade/src/screens/Wardrobe.tsx b/multiplication-arcade/src/screens/Wardrobe.tsx
 new file mode 100644
-index 0000000..df218d2
+index 0000000..bd8a038
 --- /dev/null
 +++ b/multiplication-arcade/src/screens/Wardrobe.tsx
 @@ -0,0 +1,77 @@
@@ -956,7 +1014,7 @@ index 0000000..df218d2
 +    {view==="gifts"?<>
 +      <h2>מתנות הפתעה</h2>
 +      <p className="shop-note">בחר כל קופסה שתרצה. הספרה על המטבע היא המחיר, ומה שבפנים מתגלה רק בפתיחה. אין פריטים כפולים.</p>
-+      {!state.earned&&<p className="shop-note">דיוק של {CREDIT_MIN_ACCURACY}% מזכה בקרדיט אחד; מ־{DOUBLE_CREDIT_MIN_ACCURACY}% מקבלים שניים.</p>}
++      {!state.earned&&<p className="shop-note">ברוב המשחקונים, מ־{CREDIT_MIN_ACCURACY}% דיוק מקבלים קרדיט אחד ומ־{DOUBLE_CREDIT_MIN_ACCURACY}% מקבלים שניים. בספרינט 60 מרוויחים לפי מספר התשובות הנכונות.</p>}
 +      <div className="gift-switch" aria-label="סוג המתנה">
 +        <Button variant={kind==="accessory"?"primary":"ghost"} aria-pressed={kind==="accessory"} onClick={()=>{setKind("accessory");setNotice("");}}>אביזרים ({gifts.filter(g=>g.kind==="accessory").length})</Button>
 +        <Button variant={kind==="skin"?"primary":"ghost"} aria-pressed={kind==="skin"} onClick={()=>{setKind("skin");setNotice("");}}>סקינים ({gifts.filter(g=>g.kind==="skin").length})</Button>
@@ -1199,28 +1257,37 @@ index 0000000..c426dba
 +  },shop:onShop}}>{children}</RoundRewardContext.Provider>;
 +}
 diff --git a/multiplication-arcade/src/ui/SummaryModal.tsx b/multiplication-arcade/src/ui/SummaryModal.tsx
-index 492a3b0..feb23f9 100644
+index 492a3b0..77d1f29 100644
 --- a/multiplication-arcade/src/ui/SummaryModal.tsx
 +++ b/multiplication-arcade/src/ui/SummaryModal.tsx
 @@ -1,4 +1,6 @@
 -import React from "react";
 +import React, { useContext, useEffect } from "react";
-+import { CREDIT_MIN_ACCURACY, roundCredits } from "../engine/rewards";
++import { CREDIT_MIN_ACCURACY, SPRINT_CREDIT_TIERS, roundCredits, sprintCredits } from "../engine/rewards";
 +import { RoundRewardContext } from "./RoundReward";
  import { Card } from "./Card";
  import { Button } from "./Button";
  
-@@ -24,6 +26,9 @@ export function SummaryModal({
+@@ -6,6 +8,7 @@ export type SummaryData = {
+   title: string; // "כל הכבוד!" / "נגמר!"
+   score: number;
+   accuracyPct?: number; // 0..100
++  sprintCorrectAnswers?: number;
+   avgResponseMs?: number; // optional
+   durationSec?: number; // optional
+   extraLines?: Array<{ label: string; value: string }>;
+@@ -24,6 +27,10 @@ export function SummaryModal({
    onGoHighScores: () => void;
  }) {
    const accuracy = typeof data.accuracyPct === "number" ? data.accuracyPct : undefined;
 +  const reward=useContext(RoundRewardContext);
-+  const earned=roundCredits(accuracy??0);
++  const sprintCorrect=data.sprintCorrectAnswers;
++  const earned=sprintCorrect===undefined?roundCredits(accuracy??0):sprintCredits(sprintCorrect);
 +  useEffect(()=>{reward?.award(earned);},[earned,reward]);
    const avg = typeof data.avgResponseMs === "number" ? data.avgResponseMs : undefined;
  
    return (
-@@ -36,6 +41,7 @@ export function SummaryModal({
+@@ -36,6 +43,7 @@ export function SummaryModal({
          placeItems: "center",
          padding: 16,
          zIndex: 50,
@@ -1228,21 +1295,28 @@ index 492a3b0..feb23f9 100644
        }}
      >
        <div style={{ width: "min(720px, 96vw)" }}>
-@@ -68,7 +74,7 @@ export function SummaryModal({
+@@ -68,7 +76,14 @@ export function SummaryModal({
              {typeof accuracy === "number" && (
                <div className="row">
                  <div className="small">דיוק</div>
 -                <div style={{ fontWeight: 900 }}>{accuracy}%</div>
 +                <div style={{ fontWeight: 900 }}>{Number(accuracy.toFixed(2))}%</div>
++              </div>
++            )}
++
++            {sprintCorrect!==undefined && (
++              <div className="row">
++                <div className="small">תשובות נכונות</div>
++                <div style={{ fontWeight: 900 }}>{sprintCorrect}</div>
                </div>
              )}
  
-@@ -95,6 +101,9 @@ export function SummaryModal({
+@@ -95,6 +110,9 @@ export function SummaryModal({
            </div>
  
            <div className="hr" />
 +          {reward&&<div className="reward-note">
-+            {earned?<><strong>הרווחת {earned===1?"קרדיט אחד":"שני קרדיטים"}!</strong><Button onClick={reward.shop}>לחנות המתנות ←</Button></>:<span>במשחקון הבא, דיוק של {CREDIT_MIN_ACCURACY}% ומעלה יזכה אותך בקרדיט.</span>}
++            {earned?<><strong>הרווחת {earned===1?"קרדיט אחד":earned===2?"שני קרדיטים":`${earned} קרדיטים`}!</strong><Button onClick={reward.shop}>לחנות המתנות ←</Button></>:sprintCorrect!==undefined?<span>צריך לפחות {SPRINT_CREDIT_TIERS[SPRINT_CREDIT_TIERS.length-1].correct} תשובות נכונות בספרינט כדי להרוויח קרדיט.</span>:<span>במשחקון הבא, דיוק של {CREDIT_MIN_ACCURACY}% ומעלה יזכה אותך בקרדיט.</span>}
 +          </div>}
  
            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "space-between" }}>
