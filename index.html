@@ -1733,7 +1733,7 @@ function harelPage(page){
   }else if(page===HAREL_G3){
     app.innerHTML=crumbs([student,['כיתה ג׳']])+`<h1>כיתה ג׳</h1><p class="intro">בחר מקצוע</p><div class="grid">${card('חשבון והנדסה',HAREL_MATH,'מרחב התרגול בחשבון והנדסה')}</div>`;
   }else if(page===HAREL_MATH){
-    app.innerHTML=crumbs([student,grade3,['חשבון והנדסה']])+`<section class="card empty"><h1>חשבון והנדסה</h1>${empty}<a class="btn" href="${HAREL_G3}">חזרה לכיתה ג׳</a></section>`;
+    app.innerHTML=crumbs([student,grade3,['חשבון והנדסה']])+`<h1>חשבון והנדסה</h1><div class="grid"><section class="card"><span class="badge">תרגול לוח הכפל</span><h2>משחק הכפל</h2><p class="muted">חמישה משחקונים לתרגול כפל, עם מעקב אחר ההתקדמות.</p><div class="actions"><a class="btn primary" href="./games/multiplication-arcade/">משחק הכפל ←</a></div></section></div><a class="btn" href="${HAREL_G3}">חזרה לכיתה ג׳</a>`;
   }else{
     app.innerHTML=crumbs([student,['כיתה ב׳']])+`<section class="card empty"><h1>כיתה ב׳</h1>${empty}<a class="btn" href="${HAREL}">חזרה לבחירת כיתה</a></section>`;
   }

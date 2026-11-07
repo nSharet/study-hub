@@ -1,0 +1,85 @@
+diff --git a/multiplication-arcade/index.html b/multiplication-arcade/index.html
+index b4d8221..1d40d0b 100644
+--- a/multiplication-arcade/index.html
++++ b/multiplication-arcade/index.html
+@@ -6,6 +6,7 @@
+     <title>לוח כפל – משחקונים</title>
+   </head>
+   <body>
++    <nav aria-label="מרחב הלמידה" style="max-width:960px;margin:12px auto;padding:0 16px"><a href="../../#/harel/grade-3/math-geometry" style="color:inherit">חזרה לחשבון והנדסה</a></nav>
+     <div id="root"></div>
+     <script type="module" src="/src/main.tsx"></script>
+   </body>
+diff --git a/multiplication-arcade/src/App.tsx b/multiplication-arcade/src/App.tsx
+index d1c0340..033aded 100644
+--- a/multiplication-arcade/src/App.tsx
++++ b/multiplication-arcade/src/App.tsx
+@@ -1,5 +1,5 @@
+ import React, { useMemo, useState } from "react";
+-import { loadStore, saveStore, updateSettings } from "./engine/storage";
++import { loadStore, resetProgress, saveStore, updateSettings } from "./engine/storage";
+ import { GameId, Store } from "./types";
+ import { Home } from "./screens/Home";
+ import { SettingsScreen } from "./screens/Settings";
+@@ -40,7 +40,7 @@ export function App() {
+           onBack={() => go({ name: "home" })}
+           onChange={onSettings}
+           onReset={() => {
+-            localStorage.clear();
++            resetProgress();
+             setStore(loadStore());
+             go({ name: "home" });
+           }}
+diff --git a/multiplication-arcade/src/screens/HighScores.tsx b/multiplication-arcade/src/screens/HighScores.tsx
+index da620be..6189b73 100644
+--- a/multiplication-arcade/src/screens/HighScores.tsx
++++ b/multiplication-arcade/src/screens/HighScores.tsx
+@@ -1,8 +1,42 @@
+-import { GameId, Store } from "../types";
++import React from "react";
++import type { GameId, Store } from "../types";
++import { Button } from "../ui/Button";
++import { Card } from "../ui/Card";
+ 
+-export function isNewTop10(store: Store, gameId: GameId, score: number): boolean {
+-  const hs = store.highscores[gameId] ?? [];
+-  if (hs.length < 10) return true;
+-  const min = Math.min(...hs.map(x => x.score));
+-  return score > min;
++const titles: Record<GameId, string> = {
++  sprint60: "ספרינט 60",
++  quickChoice: "פגיעה בול",
++  matchPairs: "התאמת זוגות",
++  comboClimb: "טיפוס קומבו",
++  findMistake: "מצא את הטעות",
++};
++
++export function HighScores({ store, onBack }: { store: Store; onBack: () => void }) {
++  return (
++    <>
++      <div className="topbar">
++        <h1 className="h1">שיאים</h1>
++        <Button variant="ghost" onClick={onBack}>חזרה</Button>
++      </div>
++      <div className="grid">
++        {(Object.keys(titles) as GameId[]).map(game => {
++          const scores = store.highscores[game] ?? [];
++          return (
++            <div key={game} style={{ gridColumn: "span 6" }}>
++              <Card>
++                <h2 className="h2">{titles[game]}</h2>
++                {scores.length ? (
++                  <ol>
++                    {scores.map(({ score, at }, index) => (
++                      <li key={`${at}-${index}`}>{score.toLocaleString("he-IL")} נקודות</li>
++                    ))}
++                  </ol>
++                ) : <p className="small">עוד אין שיאים במשחק הזה.</p>}
++              </Card>
++            </div>
++          );
++        })}
++      </div>
++    </>
++  );
+ }

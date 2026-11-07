@@ -28,3 +28,9 @@ Settings → Pages → Deploy from a branch → main → / (root) → Save.
 
 ## סבב מתקדם
 בחנים ה׳–ו׳ ברמה גבוהה ובחנים ז׳–ח׳ ברמה גבוהה מאוד. בכל בוחן 15 שאלות, מתוכן שלוש שאלות לחיזוק הביטחון. ערבוב השאלות בבחנים אלה מפזר אותן בתחילת הבוחן ובמהלכו. המסיחים מכוונים להבחנות בין מושגים קרובים ולהסקת מסקנות מהנתונים. הבחנים א׳–ד׳ וההתקדמות הקיימת נשמרים.
+
+## משחק הכפל
+
+המשחק זמין תחת הראל ← כיתה ג׳ ← חשבון והנדסה. קובצי האתר הבנויים נמצאים ב־`games/multiplication-arcade/` ונפרסים יחד עם מרחב הלמידה.
+
+מקור: [practicing-multiplication-tables](https://github.com/nSharet/practicing-multiplication-tables), גרסה `cf50ff097734f500aed9ad296896031e49624804`. לבנייה מחדש, יש להחיל על גרסה זו את `tools/multiplication-arcade.patch` עם `git apply`, להריץ `npm install` ואז `npm run build -- --base=./` בתיקיית `multiplication-arcade`, ולהחליף את קובצי המשחק בתוכן של `dist`.
