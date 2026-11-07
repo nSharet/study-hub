@@ -203,52 +203,53 @@ index d1c0340..fa86926 100644
            onGoHighScores={() => go({ name: "highscores" })}
 diff --git a/multiplication-arcade/src/engine/rewards.ts b/multiplication-arcade/src/engine/rewards.ts
 new file mode 100644
-index 0000000..679501a
+index 0000000..03532fe
 --- /dev/null
 +++ b/multiplication-arcade/src/engine/rewards.ts
-@@ -0,0 +1,97 @@
+@@ -0,0 +1,98 @@
 +export type Hero = "robot" | "fox";
 +export type GiftKind = "skin" | "accessory";
 +export type GiftId = `${GiftKind}-${number}`;
 +
 +export const catalog = [
-+  { id:"neon", name:"סקין ניאון", slot:"skin", cost:2, palette:["#9bff62","#278841","#e8ffab"] },
-+  { id:"galaxy", name:"סקין גלקסיה", slot:"skin", cost:2, palette:["#ac79fa","#543ab4","#ffe18c"] },
-+  { id:"lava", name:"סקין לבה", slot:"skin", cost:2, palette:["#ff7542","#a52c38","#ffdf7d"] },
-+  { id:"frost", name:"סקין קרח", slot:"skin", cost:2, palette:["#99edff","#437ec2","#f1ffff"] },
-+  { id:"jungle", name:"סקין ג׳ונגל", slot:"skin", cost:2, palette:["#75cc77","#256d55","#ddff87"] },
-+  { id:"candy", name:"סקין ממתקים", slot:"skin", cost:2, palette:["#ff9dd9","#b94fa6","#fff6db"] },
-+  { id:"ocean", name:"סקין מעמקים", slot:"skin", cost:2, palette:["#60c5fa","#2a4bad","#a8fff3"] },
-+  { id:"sunset", name:"סקין שקיעה", slot:"skin", cost:2, palette:["#ffc063","#b8488b","#fff49a"] },
-+  { id:"stealth", name:"סקין נינג׳ת לילה", slot:"skin", cost:2, palette:["#777892","#343350","#ff587e"] },
-+  { id:"gold", name:"סקין זהב מלכותי", slot:"skin", cost:2, palette:["#ffe174","#a66a35","#fff7c6"] },
-+  { id:"crown", name:"כתר האלופים", slot:"head", cost:1 },
++  { id:"neon", name:"סקין ניאון", slot:"skin", cost:5, palette:["#9bff62","#278841","#e8ffab"] },
++  { id:"galaxy", name:"סקין גלקסיה", slot:"skin", cost:12, palette:["#ac79fa","#543ab4","#ffe18c"] },
++  { id:"lava", name:"סקין לבה", slot:"skin", cost:8, palette:["#ff7542","#a52c38","#ffdf7d"] },
++  { id:"frost", name:"סקין קרח", slot:"skin", cost:8, palette:["#99edff","#437ec2","#f1ffff"] },
++  { id:"jungle", name:"סקין ג׳ונגל", slot:"skin", cost:5, palette:["#75cc77","#256d55","#ddff87"] },
++  { id:"candy", name:"סקין ממתקים", slot:"skin", cost:5, palette:["#ff9dd9","#b94fa6","#fff6db"] },
++  { id:"ocean", name:"סקין מעמקים", slot:"skin", cost:8, palette:["#60c5fa","#2a4bad","#a8fff3"] },
++  { id:"sunset", name:"סקין שקיעה", slot:"skin", cost:5, palette:["#ffc063","#b8488b","#fff49a"] },
++  { id:"stealth", name:"סקין נינג׳ת לילה", slot:"skin", cost:12, palette:["#777892","#343350","#ff587e"] },
++  { id:"gold", name:"סקין זהב מלכותי", slot:"skin", cost:12, palette:["#ffe174","#a66a35","#fff7c6"] },
++  { id:"crown", name:"כתר האלופים", slot:"head", cost:3 },
 +  { id:"cap", name:"כובע סקייטר", slot:"head", cost:1 },
-+  { id:"halo", name:"הילה זוהרת", slot:"head", cost:1 },
-+  { id:"helmet", name:"קסדת אסטרונאוט", slot:"head", cost:1 },
-+  { id:"visor", name:"משקפי לייזר", slot:"face", cost:1 },
++  { id:"halo", name:"הילה זוהרת", slot:"head", cost:2 },
++  { id:"helmet", name:"קסדת אסטרונאוט", slot:"head", cost:3 },
++  { id:"visor", name:"משקפי לייזר", slot:"face", cost:3 },
 +  { id:"shades", name:"משקפי שמש", slot:"face", cost:1 },
-+  { id:"goggles", name:"משקפי טייס", slot:"face", cost:1 },
-+  { id:"mask", name:"מסכת גיבור", slot:"face", cost:1 },
-+  { id:"cape", name:"גלימת ברק", slot:"back", cost:1 },
-+  { id:"wings", name:"כנפי מכונה", slot:"back", cost:1 },
-+  { id:"jetpack", name:"תרמיל טילים", slot:"back", cost:1 },
++  { id:"goggles", name:"משקפי טייס", slot:"face", cost:2 },
++  { id:"mask", name:"מסכת גיבור", slot:"face", cost:2 },
++  { id:"cape", name:"גלימת ברק", slot:"back", cost:3 },
++  { id:"wings", name:"כנפי מכונה", slot:"back", cost:3 },
++  { id:"jetpack", name:"תרמיל טילים", slot:"back", cost:3 },
 +  { id:"scarf", name:"צעיף רוח", slot:"back", cost:1 },
 +  { id:"badge", name:"סמל הכפל", slot:"chest", cost:1 },
-+  { id:"medal", name:"מדליית הזהב", slot:"chest", cost:1 },
++  { id:"medal", name:"מדליית הזהב", slot:"chest", cost:2 },
 +  { id:"bow", name:"עניבת פרפר", slot:"chest", cost:1 },
-+  { id:"gem", name:"גביש כוח", slot:"chest", cost:1 },
-+  { id:"shield", name:"מגן כוכב", slot:"hand", cost:1 },
-+  { id:"wand", name:"שרביט ניצוצות", slot:"hand", cost:1 },
++  { id:"gem", name:"גביש כוח", slot:"chest", cost:2 },
++  { id:"shield", name:"מגן כוכב", slot:"hand", cost:2 },
++  { id:"wand", name:"שרביט ניצוצות", slot:"hand", cost:2 },
 +  { id:"pad", name:"שלט ארקייד", slot:"hand", cost:1 },
 +  { id:"balloon", name:"בלון חלל", slot:"hand", cost:1 },
 +] as const;
 +export type Item = typeof catalog[number];
 +export type Outfit = Partial<Record<Item["slot"], Item["id"]>>;
-+export type Gift = { id:GiftId; kind:GiftKind; number:number; item:Item["id"] };
++export type Gift = { id:GiftId; kind:GiftKind; number:number; item:Item["id"]; cost:Item["cost"] };
 +export type Wardrobe = { hero:Hero; credits:number; earned:number; owned:Item["id"][]; outfits:Record<Hero,Outfit>; gifts:Gift[] };
 +const KEY="mul_arcade_wardrobe_v1";
-+export const giftCost=(kind:GiftKind)=>kind==="skin"?2:1;
++export const CREDIT_MIN_ACCURACY=75;
++export const DOUBLE_CREDIT_MIN_ACCURACY=95;
 +const itemKind=(item:Item):GiftKind=>item.slot==="skin"?"skin":"accessory";
 +
 +function dealGifts():Gift[]{
@@ -258,7 +259,7 @@ index 0000000..679501a
 +      const j=Math.floor(Math.random()*(i+1));
 +      [items[i],items[j]]=[items[j],items[i]];
 +    }
-+    return items.map((item,i)=>({id:`${kind}-${i+1}`,kind,number:i+1,item:item.id}));
++    return items.map((item,i)=>({id:`${kind}-${i+1}`,kind,number:i+1,item:item.id,cost:item.cost}));
 +  });
 +}
 +export const emptyWardrobe=():Wardrobe=>({hero:"robot",credits:0,earned:0,owned:[],outfits:{robot:{},fox:{}},gifts:dealGifts()});
@@ -270,12 +271,12 @@ index 0000000..679501a
 +  for(const gift of fallback){
 +    const item=catalog.find(i=>i.id===byId.get(gift.id)&&itemKind(i)===gift.kind);
 +    if(!item||used.has(item.id))return fallback;
-+    used.add(item.id);gifts.push({...gift,item:item.id});
++    used.add(item.id);gifts.push({...gift,item:item.id,cost:item.cost});
 +  }
 +  return gifts;
 +}
 +export function roundCredits(accuracy:number):number {
-+  return !Number.isFinite(accuracy)||accuracy>100 ? 0 : accuracy>=95 ? 2 : accuracy>70 ? 1 : 0;
++  return !Number.isFinite(accuracy)||accuracy>100 ? 0 : accuracy>=DOUBLE_CREDIT_MIN_ACCURACY ? 2 : accuracy>=CREDIT_MIN_ACCURACY ? 1 : 0;
 +}
 +export function loadWardrobe():Wardrobe {
 +  const initial=emptyWardrobe();
@@ -294,8 +295,8 @@ index 0000000..679501a
 +
 +export function openGift(s:Wardrobe,id:GiftId):Wardrobe {
 +  const gift=s.gifts.find(g=>g.id===id);
-+  if(!gift||s.owned.includes(gift.item)||s.credits<giftCost(gift.kind))return s;
-+  return {...s,credits:s.credits-giftCost(gift.kind),owned:[...s.owned,gift.item]};
++  if(!gift||s.owned.includes(gift.item)||s.credits<gift.cost)return s;
++  return {...s,credits:s.credits-gift.cost,owned:[...s.owned,gift.item]};
 +}
 +export function equipOwned(s:Wardrobe,item:Item):Wardrobe {
 +  if(!s.owned.includes(item.id))return s;
@@ -901,17 +902,16 @@ index 57a0835..8696882 100644
            <div key={c.id} style={{ gridColumn: "span 6" }}>
 diff --git a/multiplication-arcade/src/screens/Wardrobe.tsx b/multiplication-arcade/src/screens/Wardrobe.tsx
 new file mode 100644
-index 0000000..4bef8f2
+index 0000000..df218d2
 --- /dev/null
 +++ b/multiplication-arcade/src/screens/Wardrobe.tsx
-@@ -0,0 +1,78 @@
+@@ -0,0 +1,77 @@
 +import React, { useEffect, useRef, useState } from "react";
-+import { catalog, giftCost } from "../engine/rewards";
++import { catalog, CREDIT_MIN_ACCURACY, DOUBLE_CREDIT_MIN_ACCURACY } from "../engine/rewards";
 +import type { GiftId, GiftKind, Hero, Item, Wardrobe as WardrobeState } from "../engine/rewards";
 +import { ArcadeHero, heroNames } from "../ui/ArcadeHero";
 +import { Button } from "../ui/Button";
 +
-+const kindNames:Record<GiftKind,string>={skin:"סקין",accessory:"אביזר"};
 +const creditText=(n:number)=>n===1?"קרדיט אחד":`${n} קרדיטים`;
 +function GiftArt({kind}:{kind:GiftKind}){
 +  return <svg viewBox="0 0 72 68" width="64" height="60" aria-hidden="true">
@@ -955,18 +955,18 @@ index 0000000..4bef8f2
 +    </div>
 +    {view==="gifts"?<>
 +      <h2>מתנות הפתעה</h2>
-+      <p className="shop-note">בחר כל קופסה שתרצה. על הקופסה כתוב רק הסוג; מה בפנים מתגלה בפתיחה. אין פריטים כפולים.</p>
-+      {!state.earned&&<p className="shop-note">כדי להרוויח קרדיטים, סיים משחקון בדיוק של יותר מ־70%.</p>}
++      <p className="shop-note">בחר כל קופסה שתרצה. הספרה על המטבע היא המחיר, ומה שבפנים מתגלה רק בפתיחה. אין פריטים כפולים.</p>
++      {!state.earned&&<p className="shop-note">דיוק של {CREDIT_MIN_ACCURACY}% מזכה בקרדיט אחד; מ־{DOUBLE_CREDIT_MIN_ACCURACY}% מקבלים שניים.</p>}
 +      <div className="gift-switch" aria-label="סוג המתנה">
 +        <Button variant={kind==="accessory"?"primary":"ghost"} aria-pressed={kind==="accessory"} onClick={()=>{setKind("accessory");setNotice("");}}>אביזרים ({gifts.filter(g=>g.kind==="accessory").length})</Button>
 +        <Button variant={kind==="skin"?"primary":"ghost"} aria-pressed={kind==="skin"} onClick={()=>{setKind("skin");setNotice("");}}>סקינים ({gifts.filter(g=>g.kind==="skin").length})</Button>
 +      </div>
 +      <p className="gift-status" role="status">{notice}</p>
-+      <div className="gift-grid">{gifts.filter(g=>g.kind===kind).map(g=><button key={g.id} className="gift-box" data-kind={g.kind} onClick={()=>{
-+        const cost=giftCost(g.kind);
++      <div className="gift-grid">{gifts.filter(g=>g.kind===kind).map(g=><button key={g.id} className="gift-box" data-kind={g.kind} aria-label={`מתנה ${g.number}, מחיר: ${creditText(g.cost)}`} onClick={()=>{
++        const cost=g.cost;
 +        if(state.credits<cost){setNotice(`לפתיחת מתנה ${g.number} צריך עוד ${creditText(cost-state.credits)}. שחק עוד סיבוב וצבור קרדיטים!`);return;}
 +        setNotice("");setSelected(g.id);onOpen(g.id);
-+      }}><GiftArt kind={g.kind}/><strong>{kindNames[g.kind]} · מתנה {g.number}</strong><span>{creditText(giftCost(g.kind))}</span></button>)}</div>
++      }}><GiftArt kind={g.kind}/><strong>מתנה {g.number}</strong><span className="gift-coin" aria-hidden="true">{g.cost}</span></button>)}</div>
 +      {!gifts.some(g=>g.kind===kind)&&<p className="shop-note">פתחת את כל המתנות מהסוג הזה. הפריטים מחכים לך באוסף!</p>}
 +    </>:<>
 +      <h2>האוסף שלי</h2>
@@ -984,7 +984,7 @@ index 0000000..4bef8f2
 +  </>;
 +}
 diff --git a/multiplication-arcade/src/styles.css b/multiplication-arcade/src/styles.css
-index faaf8db..3f70285 100644
+index faaf8db..c740c20 100644
 --- a/multiplication-arcade/src/styles.css
 +++ b/multiplication-arcade/src/styles.css
 @@ -1,3 +1,19 @@
@@ -1023,7 +1023,7 @@ index faaf8db..3f70285 100644
  a{ color:inherit; text-decoration:none; }
  .container{
    max-width: 980px;
-@@ -101,3 +119,38 @@ a{ color:inherit; text-decoration:none; }
+@@ -101,3 +119,39 @@ a{ color:inherit; text-decoration:none; }
    font-size: 13px;
    color: var(--muted);
  }
@@ -1049,11 +1049,12 @@ index faaf8db..3f70285 100644
 +
 +.gift-switch{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
 +.gift-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(126px,1fr));gap:12px}
-+.gift-box{display:grid;gap:4px;justify-items:center;align-content:center;min-height:136px;padding:10px 6px;border:1px solid #4ba39b;border-radius:18px;background:linear-gradient(150deg,#223f57,#172d43);color:var(--text);cursor:pointer;transition:transform .15s,box-shadow .15s}
++.gift-box{position:relative;display:grid;gap:4px;justify-items:center;align-content:center;min-height:136px;padding:10px 6px;border:1px solid #4ba39b;border-radius:18px;background:linear-gradient(150deg,#223f57,#172d43);color:var(--text);cursor:pointer;transition:transform .15s,box-shadow .15s}
 +.gift-box[data-kind=skin]{border-color:#a98cfc;background:linear-gradient(150deg,#453979,#272a53)}
 +.gift-box:hover{transform:translateY(-3px);box-shadow:0 7px 20px #03061688}
 +.gift-box:focus-visible,.gift-switch button:focus-visible{outline:3px solid #ffe69c;outline-offset:3px}
-+.gift-box span{color:#ffe6a2;font-size:.9rem}
++.gift-coin{position:absolute;inset-block-start:8px;inset-inline-start:8px;display:grid;place-items:center;width:34px;height:34px;border:2px solid #ffe8a0;border-radius:50%;background:radial-gradient(circle at 30% 23%,#fff0a2 8%,#ffce52 49%,#eb991e 86%);box-shadow:inset 0 0 0 2px #c77b18,0 2px 5px #07091890;color:#492800;font-size:1rem;font-weight:900;line-height:1;font-variant-numeric:tabular-nums}
++.gift-coin::after{content:"";position:absolute;inset-block-start:-5px;inset-inline-start:-4px;width:12px;height:12px;background:#fff7ce;clip-path:polygon(50% 0,62% 38%,100% 50%,62% 62%,50% 100%,38% 62%,0 50%,38% 38%)}
 +.gift-status{color:#ffe6a2;min-height:1.5em}
 +.gift-reveal{width:min(370px,calc(100% - 28px));max-height:calc(100% - 28px);overflow:auto;text-align:center;background:linear-gradient(155deg,#292a55,#141a39);border:2px solid #a893ff;color:var(--text);border-radius:24px;padding:16px;box-shadow:var(--shadow)}
 +.gift-reveal::backdrop{background:#080b1add}.gift-reveal p,.gift-reveal h2{margin:5px 0 10px}
@@ -1198,13 +1199,13 @@ index 0000000..c426dba
 +  },shop:onShop}}>{children}</RoundRewardContext.Provider>;
 +}
 diff --git a/multiplication-arcade/src/ui/SummaryModal.tsx b/multiplication-arcade/src/ui/SummaryModal.tsx
-index 492a3b0..bf81bcb 100644
+index 492a3b0..feb23f9 100644
 --- a/multiplication-arcade/src/ui/SummaryModal.tsx
 +++ b/multiplication-arcade/src/ui/SummaryModal.tsx
 @@ -1,4 +1,6 @@
 -import React from "react";
 +import React, { useContext, useEffect } from "react";
-+import { roundCredits } from "../engine/rewards";
++import { CREDIT_MIN_ACCURACY, roundCredits } from "../engine/rewards";
 +import { RoundRewardContext } from "./RoundReward";
  import { Card } from "./Card";
  import { Button } from "./Button";
@@ -1241,7 +1242,7 @@ index 492a3b0..bf81bcb 100644
  
            <div className="hr" />
 +          {reward&&<div className="reward-note">
-+            {earned?<><strong>הרווחת {earned===1?"קרדיט אחד":"שני קרדיטים"}!</strong><Button onClick={reward.shop}>לחנות המתנות ←</Button></>:<span>במשחקון הבא, יותר מ־70% דיוק יזכו אותך בקרדיט.</span>}
++            {earned?<><strong>הרווחת {earned===1?"קרדיט אחד":"שני קרדיטים"}!</strong><Button onClick={reward.shop}>לחנות המתנות ←</Button></>:<span>במשחקון הבא, דיוק של {CREDIT_MIN_ACCURACY}% ומעלה יזכה אותך בקרדיט.</span>}
 +          </div>}
  
            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "space-between" }}>
