@@ -1,0 +1,142 @@
+.english-exam {
+  max-width: 740px;
+}
+
+.english-exam [dir="ltr"] {
+  text-align: left;
+}
+
+.english-exam .question h2 {
+  margin-bottom: 16px;
+  overflow-wrap: anywhere;
+}
+
+.english-exam .progress {
+  margin: 8px 0 16px;
+}
+
+.english-exam .answer {
+  min-height: 48px;
+  text-align: start;
+}
+
+.english-exam .answer[aria-pressed="true"],
+.english-exam .btn[aria-pressed="true"] {
+  border-color: var(--green);
+  background: var(--soft);
+  box-shadow: inset 0 0 0 1px var(--green);
+}
+
+.english-exam .answer[aria-pressed="true"]::before {
+  content: "✓" / "";
+}
+
+.english-passage,
+.english-jump {
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 4px 15px;
+  margin: 12px 0;
+}
+
+.english-passage > summary,
+.english-jump > summary {
+  cursor: pointer;
+  font-weight: bold;
+  padding: 8px 0;
+}
+
+.english-passage p,
+.english-cloze {
+  font-size: 17px;
+}
+
+.english-cloze mark {
+  background: #f7e3b4;
+  border-radius: 4px;
+  padding: 0 3px;
+}
+
+.english-exam label {
+  display: block;
+  font-weight: bold;
+  margin-top: 12px;
+}
+
+.english-exam input[type="text"],
+.english-exam textarea {
+  display: block;
+  width: 100%;
+  min-height: 48px;
+  padding: 10px 12px;
+  border: 1px solid #82968c;
+  border-radius: 10px;
+  background: white;
+  color: var(--ink);
+  font: inherit;
+  font-size: 17px;
+}
+
+.english-exam textarea {
+  resize: vertical;
+}
+
+.english-bank {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+
+.english-bank legend {
+  font-weight: bold;
+  margin-bottom: 6px;
+  padding: 0;
+}
+
+.english-bank .answers {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.english-jump-section {
+  margin: 10px 0 15px;
+}
+
+.english-jump .qnav {
+  margin-top: 6px;
+  gap: 8px;
+}
+
+.english-jump .qnav button {
+  width: 44px;
+  height: 44px;
+}
+
+.english-section-scores {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.english-section-scores > div {
+  display: flex;
+  flex-direction: column;
+  padding: 10px;
+  border-radius: 9px;
+  background: var(--soft);
+}
+
+.english-exam .review summary {
+  min-height: 30px;
+}
+
+.english-exam .review p {
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 420px) {
+  .english-filters .btn {
+    flex: 1 0 43%;
+  }
+}
