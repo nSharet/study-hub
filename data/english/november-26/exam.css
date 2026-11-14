@@ -140,3 +140,41 @@
     flex: 1 0 43%;
   }
 }
+
+.arabic-exam [lang="ar"] {
+  font-size: 28px;
+  line-height: 1.65;
+}
+
+.arabic-glyph {
+  font-size: 20px;
+}
+
+.arabic-exam .arabic-glyph [lang="ar"] {
+  font-size: 40px;
+}
+
+.arabic-exam input[lang="ar"] {
+  font-size: 28px;
+}
+
+.arabic-keyboard {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.arabic-keyboard .btn {
+  min-width: 46px;
+  min-height: 46px;
+  padding: 1px 8px;
+}
+
+.arabic-exam label:has(#arabic-written) {
+  display: inline-flex;
+  min-height: 48px;
+  gap: 8px;
+  align-items: center;
+  cursor: pointer;
+}
