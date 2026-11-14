@@ -126,7 +126,19 @@ const renderAt = path => {
 assert.match(renderAt('#/ron/grade-8'), /#\/ron\/grade-8\/arabic/);
 assert.match(renderAt('#/ron/grade-8/arabic'), /הכנה למבחן ערבית נובמבר 26/);
 assert.equal((renderAt(arabicMenu).match(/\/exam-[123]/g) || []).length, 3);
-assert.equal(arabic.exams.length, 3);
+assert.equal(arabic.exams.length, 4);
+assert.match(renderAt(arabicMenu), /מבחן ממוקד · חמש אותיות/);
+const focused = arabic.exams[3];
+assert.equal(focused.letters, 'تملسف');
+for (const question of [...focused.recognition, ...focused.writing, ...focused.marks]) {
+  const displayed = [question.glyph || '', question.answer, ...(question.options || [])].join(' ');
+  for (const symbol of displayed.match(/\p{Script=Arabic}/gu) || []) {
+    assert('تملسفأإ'.includes(symbol), symbol);
+  }
+}
+storage['study-hub-ron-arabic-november-26-4'] = JSON.stringify({ index: 8, submitted: false, answers: {}, checks: {} });
+assert.equal((renderAt(arabicMenu + '/exam-4').match(/data-arabic-key="[^"]+"/g) || []).length, 5);
+delete storage['study-hub-ron-arabic-november-26-4'];
 for (const [i, exam] of arabic.exams.entries()) {
   const route = arabicMenu + '/exam-' + (i + 1);
   const key = 'study-hub-ron-arabic-november-26-' + (i + 1);
@@ -136,7 +148,7 @@ for (const [i, exam] of arabic.exams.entries()) {
   assert.match(renderAt(route), /שאלה 1 מתוך 20/);
   assert(!app.innerHTML.includes(questions[0].explanation));
 
-  const attempt = { index: 18, submitted: false, checks: {}, answers: {} };
+  const attempt = { index: questions.findIndex(question => question.kind === 'arabicMark'), submitted: false, checks: {}, answers: {} };
   storage[key] = JSON.stringify(attempt);
   assert.match(renderAt(route), /aria-label="מקלדת ערבית"/);
   assert.match(app.innerHTML, /data-arabic-key="َ"/);
@@ -158,9 +170,9 @@ for (const [i, exam] of arabic.exams.entries()) {
   }
   storage[key] = JSON.stringify(attempt);
   assert.match(renderAt(route), /100 \/ 100/);
-  attempt.answers[18].text = attempt.answers[18].text.replace(/\p{M}/gu, '');
+  attempt.answers[attempt.index].text = attempt.answers[attempt.index].text.replace(/\p{M}/gu, '');
   storage[key] = JSON.stringify(attempt);
   assert.match(renderAt(route), /95 \/ 100/);
   assert.equal((app.innerHTML.match(/data-english-result="wrong"/g) || []).length, 1);
 }
-console.log('PASS: 3 Arabic exams, direct links, delayed feedback, exact vowel grading, handwritten self-check, and 100/100.');
+console.log('PASS: 4 Arabic exams, direct links, delayed feedback, exact vowel grading, handwritten self-check, and 100/100.');

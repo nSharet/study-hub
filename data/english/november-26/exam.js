@@ -102,7 +102,7 @@ function createRonExam({ language, label, direction, exams, sections, keyboard }
           const number = index + 1;
           const attempt = load(number);
           const badge = attempt.submitted ? 'תוצאות שמורות' : Object.keys(attempt.answers).length ? 'טיוטה שמורה' : (arabic ? '20' : '30') + ' שאלות · 100 נקודות';
-          return card(numberLabel(number), route(number), arabic ? esc(exam.title) : foreign(exam.title), badge);
+          return card(exam.name || numberLabel(number), route(number), arabic ? esc(exam.title) : foreign(exam.title), badge);
         }).join('')}</div>` + footer();
     }
   }
@@ -136,7 +136,7 @@ function createRonExam({ language, label, direction, exams, sections, keyboard }
     } else if (arabic) {
       input = `<label for="english-text">התשובה שלך בערבית</label>
         <input id="english-text" type="text" dir="rtl" lang="ar" autocomplete="off" spellcheck="false" value="${esc(response.text)}">
-        ${arabicKeyboard(question)}`;
+        ${arabicKeyboard(question, exam.letters)}`;
     } else {
       const long = Boolean(question.criteria);
       const attributes = 'id="english-text" dir="ltr" lang="en" autocomplete="off" spellcheck="false" autocapitalize="off" autocorrect="off"';
@@ -172,7 +172,7 @@ function createRonExam({ language, label, direction, exams, sections, keyboard }
     const jump = (i) => `<button type="button" class="${isAnswered(questions[i], i) ? 'done ' : ''}${index === i ? 'current' : ''}"
       data-english-jump="${i}" aria-label="שאלה ${i + 1}, ${isAnswered(questions[i], i) ? 'נענתה' : 'לא נענתה'}"${index === i ? ' aria-current="step"' : ''}>${i + 1}</button>`;
     app.innerHTML = crumbs(examTrail(number)) + `<div class="english-exam${arabic ? ' arabic-exam' : ''}">
-      <div class="topline"><strong>${numberLabel(number)} · ${question.section.label}</strong><span>שאלה ${index + 1} מתוך ${total}</span></div>
+      <div class="topline"><strong>${exam.name || numberLabel(number)} · ${question.section.label}</strong><span>שאלה ${index + 1} מתוך ${total}</span></div>
       <div id="english-progress-text" class="muted">נענו ${count} מתוך ${total}</div>
       <div id="english-progress" class="progress" role="progressbar" aria-valuenow="${count}" aria-valuemin="0" aria-valuemax="${total}" aria-label="שאלות שנענו"><i style="width:${count / total * 100}%"></i></div>
       ${question.section.key === 'reading' ? reading(exam, index === 0) : ''}
@@ -256,9 +256,10 @@ function createRonExam({ language, label, direction, exams, sections, keyboard }
     return `<p class="arabic-glyph">${question.kind === 'arabicText' ? esc(question.glyph) : foreign(question.glyph)}</p>`;
   }
 
-  function arabicKeyboard(question) {
+  function arabicKeyboard(question, allowedLetters) {
     const marking = question.kind === 'arabicMark';
-    const keys = marking ? [...keyboard.letters.filter(([letter]) => letter === question.glyph), ...keyboard.marks] : keyboard.letters;
+    const letters = keyboard.letters.filter(([letter]) => !allowedLetters || allowedLetters.includes(letter));
+    const keys = marking ? [...letters.filter(([letter]) => letter === question.glyph), ...keyboard.marks] : letters;
     return `<div class="arabic-keyboard" aria-label="מקלדת ערבית" dir="rtl">
       ${keys.map(([symbol, name]) => `<button type="button" class="btn" data-arabic-key="${esc(symbol)}"
         aria-label="${esc(name)}">${foreign(/\p{M}/u.test(symbol) ? '◌' + symbol : symbol)}</button>`).join('')}
