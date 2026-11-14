@@ -22,7 +22,11 @@ function createRonExam({ language, label, direction, exams, sections, keyboard }
   const labels = { correct: 'נכון', wrong: 'שגוי', missing: 'לא נענתה', pending: 'נדרשת בדיקה עצמית' };
   const filters = { all: 'כל השאלות', wrong: 'שגויות', missing: 'חסרות', pending: 'לבדיקה עצמית' };
   const route = number => menu + '/exam-' + number;
-  const key = number => 'study-hub-ron-' + language + '-november-26-' + number;
+  const key = number => {
+    const revision = exams[number - 1].revision;
+    return 'study-hub-ron-' + language + '-november-26-' + number + (revision ? '-v' + revision : '');
+  };
+  const questionCount = exam => sections.reduce((total, section) => total + exam[section.key].length, 0);
   const empty = () => ({ index: 0, answers: {}, submitted: false, checks: {} });
   const footer = () => '<footer>התשובות וההתקדמות נשמרות בדפדפן במכשיר הזה.</footer>';
   const isArabicText = value => /\p{Script=Arabic}/u.test(value);
@@ -92,16 +96,16 @@ function createRonExam({ language, label, direction, exams, sections, keyboard }
     } else if (path === grade) {
       app.innerHTML = crumbs(trail.slice(0, 2)) + `<h1>כיתה ח׳</h1><p class="intro">בחרי מקצוע</p><div class="grid">${card('אנגלית', subject, 'הבנת הנקרא, אוצר מילים ודקדוק')}${card('ערבית', grade + '/arabic', 'זיהוי אותיות, כתיבה וניקוד')}</div>`;
     } else if (path === subject) {
-      app.innerHTML = crumbs(trail.slice(0, 3)) + `<h1>${label}</h1><div class="grid">${card('הכנה למבחן ' + label + ' נובמבר 26', menu, 'שלושה מבחני הכנה ברמת כיתה ח׳', '3 מבחני הכנה')}</div>`;
+      app.innerHTML = crumbs(trail.slice(0, 3)) + `<h1>${label}</h1><div class="grid">${card('הכנה למבחן ' + label + ' נובמבר 26', menu, 'מבחני הכנה ברמת כיתה ח׳', exams.length + ' מבחני הכנה')}</div>`;
     } else {
       app.innerHTML = crumbs(trail) + `<div class="eyebrow">${label} · כיתה ח׳</div>
         <h1>הכנה למבחן ${label} נובמבר 26</h1>
-        <p class="intro">${arabic ? 'בכל מבחן 20 שאלות בזיהוי אותיות, כתיבה וניקוד. הכיני מחברת לשתי שאלות כתיבה ביד.'
+        <p class="intro">${arabic ? 'תרגלי זיהוי אותיות, כתיבה וניקוד. הכיני מחברת לשאלות הכתיבה ביד.'
           : 'שלושה מבחנים באותה רמה. בכל מבחן 30 שאלות בהבנת הנקרא, באוצר מילים ובדקדוק.'} התשובות והציון מופיעים אחרי ההגשה.</p>
         <div class="grid">${exams.map((exam, index) => {
           const number = index + 1;
           const attempt = load(number);
-          const badge = attempt.submitted ? 'תוצאות שמורות' : Object.keys(attempt.answers).length ? 'טיוטה שמורה' : (arabic ? '20' : '30') + ' שאלות · 100 נקודות';
+          const badge = attempt.submitted ? 'תוצאות שמורות' : Object.keys(attempt.answers).length ? 'טיוטה שמורה' : questionCount(exam) + ' שאלות · 100 נקודות';
           return card(exam.name || numberLabel(number), route(number), arabic ? esc(exam.title) : foreign(exam.title), badge);
         }).join('')}</div>` + footer();
     }
@@ -183,7 +187,7 @@ function createRonExam({ language, label, direction, exams, sections, keyboard }
       </div>
       <details class="english-jump"><summary>מעבר ישיר בין שאלות</summary>
         ${sections.map(section => `<div class="english-jump-section"><strong>${section.label}</strong>
-          <div class="qnav">${questions.map((item, i) => item.section === section ? jump(i) : '').join('')}</div></div>`).join('')}
+          <div class="qnav">${questions.map((item, i) => item.section.key === section.key ? jump(i) : '').join('')}</div></div>`).join('')}
       </details>
       <div class="actions"><button type="button" class="btn primary" id="english-submit">סיימתי</button><a class="btn" href="${menu}">חזרה למבחנים</a></div>
       ${saveWarning()}
@@ -298,7 +302,7 @@ function createRonExam({ language, label, direction, exams, sections, keyboard }
       ${pending ? `<p>נקבעו <strong>${points} נקודות</strong>. עוד <strong>${pending} נקודות</strong> פתוחות לבדיקה עצמית.</p>` : ''}
       <div class="english-section-scores">${sections.map(section => {
         const result = totals[section.key];
-        const maximum = questions.filter(question => question.section === section).length * section.points;
+        const maximum = questions.filter(question => question.section.key === section.key).reduce((sum, question) => sum + question.section.points, 0);
         return `<div><span>${section.label}</span><strong>${fraction(result.points, maximum)}</strong>
           ${result.pending ? `<small>${result.pending} נק׳ לבדיקה עצמית</small>` : ''}</div>`;
       }).join('')}</div>`;
@@ -396,7 +400,10 @@ function createRonExam({ language, label, direction, exams, sections, keyboard }
     const number = exams.findIndex((_, i) => route(i + 1) === path) + 1;
     if (!number) return false;
     const exam = exams[number - 1];
-    const questions = sections.flatMap(section => exam[section.key].map(question => ({ ...question, section })));
+    const examSections = exam.pointsPerQuestion
+      ? sections.map(section => ({ ...section, points: exam.pointsPerQuestion }))
+      : sections;
+    const questions = examSections.flatMap(section => exam[section.key].map(question => ({ ...question, section })));
     renderAttempt(number, exam, questions, load(number));
     return true;
   }
