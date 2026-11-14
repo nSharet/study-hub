@@ -127,25 +127,34 @@ assert.match(renderAt('#/ron/grade-8'), /#\/ron\/grade-8\/arabic/);
 assert.match(renderAt('#/ron/grade-8/arabic'), /הכנה למבחן ערבית נובמבר 26/);
 assert.equal((renderAt(arabicMenu).match(/\/exam-[123]/g) || []).length, 3);
 assert.equal(arabic.exams.length, 4);
-assert.match(renderAt(arabicMenu), /מבחן ממוקד · חמש אותיות/);
+assert.match(renderAt(arabicMenu), /מבחן ממוקד · שש אותיות/);
 const focused = arabic.exams[3];
-assert.equal(focused.letters, 'تملسف');
+assert.match(app.innerHTML, /50 שאלות/);
+assert.equal(focused.letters, 'تملسفع');
 for (const question of [...focused.recognition, ...focused.writing, ...focused.marks]) {
   const displayed = [question.glyph || '', question.answer, ...(question.options || [])].join(' ');
   for (const symbol of displayed.match(/\p{Script=Arabic}/gu) || []) {
-    assert('تملسفأإ'.includes(symbol), symbol);
+    assert('تملسفعأإ'.includes(symbol), symbol);
   }
 }
-storage['study-hub-ron-arabic-november-26-4'] = JSON.stringify({ index: 8, submitted: false, answers: {}, checks: {} });
-assert.equal((renderAt(arabicMenu + '/exam-4').match(/data-arabic-key="[^"]+"/g) || []).length, 5);
-delete storage['study-hub-ron-arabic-november-26-4'];
+const focusedKey = 'study-hub-ron-arabic-november-26-4-v2';
+const oldFocusedKey = 'study-hub-ron-arabic-november-26-4';
+storage[oldFocusedKey] = JSON.stringify({ index: 19, submitted: true, answers: {}, checks: {} });
+assert.match(renderAt(arabicMenu + '/exam-4'), /שאלה 1 מתוך 50/);
+assert.equal((app.innerHTML.match(/data-english-jump=/g) || []).length, 50);
+storage[focusedKey] = JSON.stringify({ index: 18, submitted: false, answers: {}, checks: {} });
+assert.equal((renderAt(arabicMenu + '/exam-4').match(/data-arabic-key="[^"]+"/g) || []).length, 6);
+delete storage[focusedKey];
+assert(JSON.parse(storage[oldFocusedKey]).submitted);
 for (const [i, exam] of arabic.exams.entries()) {
   const route = arabicMenu + '/exam-' + (i + 1);
-  const key = 'study-hub-ron-arabic-november-26-' + (i + 1);
+  const key = exam === focused ? focusedKey : 'study-hub-ron-arabic-november-26-' + (i + 1);
   const questions = [...exam.recognition, ...exam.writing, ...exam.marks];
-  assert.equal(questions.length, 20);
-  assert.equal(questions.filter(question => question.kind === 'handwriting').length, 2);
-  assert.match(renderAt(route), /שאלה 1 מתוך 20/);
+  const handwriting = questions.filter(question => question.kind === 'handwriting').length;
+  const points = exam.pointsPerQuestion || 5;
+  assert.equal(questions.length, exam === focused ? 50 : 20);
+  assert.equal(handwriting, exam === focused ? 4 : 2);
+  assert(renderAt(route).includes('שאלה 1 מתוך ' + questions.length));
   assert(!app.innerHTML.includes(questions[0].explanation));
 
   const attempt = { index: questions.findIndex(question => question.kind === 'arabicMark'), submitted: false, checks: {}, answers: {} };
@@ -162,17 +171,21 @@ for (const [i, exam] of arabic.exams.entries()) {
   }
   attempt.submitted = true;
   storage[key] = JSON.stringify(attempt);
-  assert.match(renderAt(route), /90 \/ 100/);
-  assert.equal((app.innerHTML.match(/data-english-result="pending"/g) || []).length, 2);
+  assert(renderAt(route).includes((100 - handwriting * points) + ' / 100'));
+  assert.equal((app.innerHTML.match(/data-english-result="pending"/g) || []).length, handwriting);
 
   for (const [index, question] of questions.entries()) {
     if (question.kind === 'handwriting') attempt.checks[index] = true;
   }
   storage[key] = JSON.stringify(attempt);
   assert.match(renderAt(route), /100 \/ 100/);
+  if (exam === focused) {
+    assert.equal((app.innerHTML.match(/32 \/ 32/g) || []).length, 2);
+    assert.match(app.innerHTML, /36 \/ 36/);
+  }
   attempt.answers[attempt.index].text = attempt.answers[attempt.index].text.replace(/\p{M}/gu, '');
   storage[key] = JSON.stringify(attempt);
-  assert.match(renderAt(route), /95 \/ 100/);
+  assert(renderAt(route).includes((100 - points) + ' / 100'));
   assert.equal((app.innerHTML.match(/data-english-result="wrong"/g) || []).length, 1);
 }
 console.log('PASS: 4 Arabic exams, direct links, delayed feedback, exact vowel grading, handwritten self-check, and 100/100.');
