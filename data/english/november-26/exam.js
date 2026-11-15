@@ -22,11 +22,16 @@ function createRonExam({ language, label, direction, exams, sections, keyboard }
   const labels = { correct: 'נכון', wrong: 'שגוי', missing: 'לא נענתה', pending: 'נדרשת בדיקה עצמית' };
   const filters = { all: 'כל השאלות', wrong: 'שגויות', missing: 'חסרות', pending: 'לבדיקה עצמית' };
   const route = number => menu + '/exam-' + number;
-  const key = number => {
-    const revision = exams[number - 1].revision;
-    return 'study-hub-ron-' + language + '-november-26-' + number + (revision ? '-v' + revision : '');
-  };
-  const questionCount = exam => sections.reduce((total, section) => total + exam[section.key].length, 0);
+  const key = (number, revision = exams[number - 1].revision) =>
+    'study-hub-ron-' + language + '-november-26-' + number + (revision ? '-v' + revision : '');
+  function examSections(exam) {
+    const base = exam.pointsPerQuestion
+      ? sections.map(section => ({ ...section, points: exam.pointsPerQuestion }))
+      : sections;
+    return exam.extraSection ? [...base, exam.extraSection] : base;
+  }
+
+  const questionCount = exam => examSections(exam).reduce((total, section) => total + exam[section.key].length, 0);
   const empty = () => ({ index: 0, answers: {}, submitted: false, checks: {} });
   const footer = () => '<footer>התשובות וההתקדמות נשמרות בדפדפן במכשיר הזה.</footer>';
   const isArabicText = value => /\p{Script=Arabic}/u.test(value);
@@ -38,7 +43,16 @@ function createRonExam({ language, label, direction, exams, sections, keyboard }
 
   function load(number) {
     try {
-      return JSON.parse(localStorage.getItem(key(number))) || empty();
+      const current = JSON.parse(localStorage.getItem(key(number)) || "null");
+      if (current) return current;
+
+      const exam = exams[number - 1];
+      if (!exam.previousRevision) return empty();
+      const previous = JSON.parse(localStorage.getItem(key(number, exam.previousRevision)));
+      if (!previous) return empty();
+
+      // The new questions are appended, so existing answer indexes still match.
+      return previous.submitted ? { ...previous, index: exam.previousQuestionCount, submitted: false } : previous;
     } catch {
       return empty();
     }
@@ -77,13 +91,13 @@ function createRonExam({ language, label, direction, exams, sections, keyboard }
     return check ? 'correct' : 'wrong';
   }
 
-  function score(questions, attempt) {
+  function score(questions, attempt, activeSections) {
     return questions.reduce((totals, question, index) => {
       const result = status(question, attempt.answers[index], attempt.checks[index]);
       if (result === 'correct') totals[question.section.key].points += question.section.points;
       if (result === 'pending') totals[question.section.key].pending += question.section.points;
       return totals;
-    }, Object.fromEntries(sections.map(section => [section.key, { points: 0, pending: 0 }])));
+    }, Object.fromEntries(activeSections.map(section => [section.key, { points: 0, pending: 0 }])));
   }
 
   function card(title, href, description, badge = '') {
@@ -186,7 +200,7 @@ function createRonExam({ language, label, direction, exams, sections, keyboard }
         <button type="button" class="btn primary" id="english-next"${index === total - 1 ? ' disabled' : ''}>הבאה ←</button>
       </div>
       <details class="english-jump"><summary>מעבר ישיר בין שאלות</summary>
-        ${sections.map(section => `<div class="english-jump-section"><strong>${section.label}</strong>
+        ${examSections(exam).map(section => `<div class="english-jump-section"><strong>${section.label}</strong>
           <div class="qnav">${questions.map((item, i) => item.section.key === section.key ? jump(i) : '').join('')}</div></div>`).join('')}
       </details>
       <div class="actions"><button type="button" class="btn primary" id="english-submit">סיימתי</button><a class="btn" href="${menu}">חזרה למבחנים</a></div>
@@ -292,15 +306,16 @@ function createRonExam({ language, label, direction, exams, sections, keyboard }
     });
   }
 
-  function scoreHtml(questions, attempt) {
-    const totals = score(questions, attempt);
+  function scoreHtml(exam, questions, attempt) {
+    const activeSections = examSections(exam);
+    const totals = score(questions, attempt, activeSections);
     const values = Object.values(totals);
     const points = values.reduce((sum, section) => sum + section.points, 0);
     const pending = values.reduce((sum, section) => sum + section.pending, 0);
     return `<strong>${pending ? 'ציון זמני' : 'ציון סופי'}</strong>
       <div class="score">${fraction(points, 100)}</div>
       ${pending ? `<p>נקבעו <strong>${points} נקודות</strong>. עוד <strong>${pending} נקודות</strong> פתוחות לבדיקה עצמית.</p>` : ''}
-      <div class="english-section-scores">${sections.map(section => {
+      <div class="english-section-scores">${activeSections.map(section => {
         const result = totals[section.key];
         const maximum = questions.filter(question => question.section.key === section.key).reduce((sum, question) => sum + question.section.points, 0);
         return `<div><span>${section.label}</span><strong>${fraction(result.points, maximum)}</strong>
@@ -336,7 +351,7 @@ function createRonExam({ language, label, direction, exams, sections, keyboard }
   function renderResults(number, exam, questions, attempt) {
     app.innerHTML = crumbs([...trail, [numberLabel(number), route(number)], ['תוצאות']]) + `<div class="english-exam${arabic ? ' arabic-exam' : ''}">
       <div class="eyebrow">${numberLabel(number)} · ${label}</div><h1 id="english-result-heading" tabindex="-1">תוצאות המבחן</h1>
-      <section class="card" id="english-score" aria-live="polite">${scoreHtml(questions, attempt)}</section>
+      <section class="card" id="english-score" aria-live="polite">${scoreHtml(exam, questions, attempt)}</section>
       <section class="review">
         <h2>סקירת תשובות</h2>
         ${exam.passage ? reading(exam, false) : ''}
@@ -376,7 +391,7 @@ function createRonExam({ language, label, direction, exams, sections, keyboard }
           row.dataset.englishResult = result;
           row.querySelector('summary').innerHTML = resultLabel(questions[index], index, result);
           buttons.forEach(item => item.setAttribute('aria-pressed', item === button));
-          document.getElementById('english-score').innerHTML = scoreHtml(questions, attempt);
+          document.getElementById('english-score').innerHTML = scoreHtml(exam, questions, attempt);
           applyFilter();
           if (row.hidden) filterButtons.find(item => item.dataset.englishFilter === activeFilter).focus();
         };
@@ -400,10 +415,7 @@ function createRonExam({ language, label, direction, exams, sections, keyboard }
     const number = exams.findIndex((_, i) => route(i + 1) === path) + 1;
     if (!number) return false;
     const exam = exams[number - 1];
-    const examSections = exam.pointsPerQuestion
-      ? sections.map(section => ({ ...section, points: exam.pointsPerQuestion }))
-      : sections;
-    const questions = examSections.flatMap(section => exam[section.key].map(question => ({ ...question, section })));
+    const questions = examSections(exam).flatMap(section => exam[section.key].map(question => ({ ...question, section })));
     renderAttempt(number, exam, questions, load(number));
     return true;
   }
