@@ -358,10 +358,36 @@ function createStudyExam({
     </details>`;
   }
 
+  function topicReview(exam, questions, attempt) {
+    return Object.entries(exam.reviewTopics).map(([topic, [title, tip]]) => {
+      const gaps = { wrong: [], missing: [], pending: [] };
+      questions.forEach((question, index) => {
+        if (question.topic !== topic) return;
+        const result = status(question, attempt.answers[index], attempt.checks[index]);
+        gaps[result]?.push(index);
+      });
+      const counts = [
+        gaps.wrong.length ? gaps.wrong.length + ' טעויות' : '',
+        gaps.missing.length ? gaps.missing.length + ' ללא תשובה' : '',
+        gaps.pending.length ? gaps.pending.length + ' לבדיקה עצמית' : '',
+      ].filter(Boolean);
+      const first = (gaps.wrong.length ? gaps.wrong : gaps.missing.length ? gaps.missing : gaps.pending)[0];
+      return `<div><h3>${esc(title)}</h3>
+        <p>${counts.length ? counts.join(' · ') : 'כל התשובות בנושא נכונות'}</p>
+        <p>${esc(tip)}</p>
+        ${first === undefined ? '' : `<button type="button" class="btn" data-review-jump="${first}">לשאלה ${first + 1}</button>`}
+      </div>`;
+    }).join('');
+  }
+
   function renderResults(number, exam, questions, attempt) {
     app.innerHTML = crumbs([...trail, [numberLabel(number), route(number)], ['תוצאות']]) + `<div class="english-exam${arabic ? ' arabic-exam' : ''}">
       <div class="eyebrow">${numberLabel(number)} · ${label}</div><h1 id="english-result-heading" tabindex="-1">תוצאות המבחן</h1>
       <section class="card" id="english-score" aria-live="polite">${scoreHtml(exam, questions, attempt)}</section>
+      ${exam.reviewTopics ? `<section class="card" style="margin-top: 16px" aria-labelledby="topic-review-heading">
+        <h2 id="topic-review-heading">מה לחזק אחרי המבחן</h2>
+        <div id="topic-review">${topicReview(exam, questions, attempt)}</div>
+      </section>` : ''}
       <section class="review">
         <h2>סקירת תשובות</h2>
         ${exam.passage ? reading(exam, false) : ''}
@@ -383,6 +409,17 @@ function createStudyExam({
       document.getElementById('english-filter-empty').hidden = rows.some(row => !row.hidden);
     }
 
+    const topicPanel = exam.reviewTopics && document.getElementById('topic-review');
+    if (topicPanel) topicPanel.onclick = event => {
+      const button = event.target.closest('[data-review-jump]');
+      if (!button) return;
+      filterButtons.find(item => item.dataset.englishFilter === 'all').click();
+      const row = rows[Number(button.dataset.reviewJump)];
+      row.open = true;
+      row.querySelector('summary').focus();
+      row.scrollIntoView({ block: 'start' });
+    };
+
     filterButtons.forEach(button => {
       button.onclick = () => {
         activeFilter = button.dataset.englishFilter;
@@ -402,6 +439,7 @@ function createStudyExam({
           row.querySelector('summary').innerHTML = resultLabel(questions[index], index, result);
           buttons.forEach(item => item.setAttribute('aria-pressed', item === button));
           document.getElementById('english-score').innerHTML = scoreHtml(exam, questions, attempt);
+          if (topicPanel) topicPanel.innerHTML = topicReview(exam, questions, attempt);
           applyFilter();
           if (row.hidden) filterButtons.find(item => item.dataset.englishFilter === activeFilter).focus();
         };
