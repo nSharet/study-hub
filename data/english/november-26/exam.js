@@ -1,13 +1,20 @@
 'use strict';
 
-function createRonExam({ language, label, direction, exams, sections, keyboard }) {
+function createStudyExam({
+  language, label, direction, exams, sections, keyboard,
+  studentId = 'ron', studentName = 'רון', gradePath = '/grade-8', gradeLabel = 'כיתה ח׳',
+  topic = 'מבחן נובמבר 26', topicPath = 'november-26', intro, studyPath,
+}) {
   const arabic = language === 'arabic';
-  const student = '#/ron';
-  const grade = student + '/grade-8';
+  const literature = language === 'literature';
+  const student = '#/' + studentId;
+  const grade = student + gradePath;
   const subject = grade + '/' + language;
-  const menu = subject + '/november-26';
-  const trail = [['רון', student], ['כיתה ח׳', grade], [label, subject], ['מבחן נובמבר 26', menu]];
+  const menu = subject + '/' + topicPath;
+  const trail = [[studentName, student], [gradeLabel, gradePath ? grade : undefined], [label, subject], [topic, menu]];
   const instructions = {
+    literatureShort: 'כתבי תשובה קצרה עם דוגמה מן הרומן.',
+    literatureEssay: 'כתבי תשובה מנומקת. פתחי בטענה ובססי אותה בדוגמאות מהיצירה.',
     tf: 'סמני אם המשפט נכון או לא נכון לפי הקטע.',
     open: 'עני באנגלית במשפט אחד או שניים לפי הקטע.',
     choice: 'בחרי את האפשרות המתאימה למשפט.',
@@ -23,7 +30,7 @@ function createRonExam({ language, label, direction, exams, sections, keyboard }
   const filters = { all: 'כל השאלות', wrong: 'שגויות', missing: 'חסרות', pending: 'לבדיקה עצמית' };
   const route = number => menu + '/exam-' + number;
   const key = (number, revision = exams[number - 1].revision) =>
-    'study-hub-ron-' + language + '-november-26-' + number + (revision ? '-v' + revision : '');
+    'study-hub-' + studentId + '-' + language + '-' + topicPath + '-' + number + (revision ? '-v' + revision : '');
   function examSections(exam) {
     const base = exam.pointsPerQuestion
       ? sections.map(section => ({ ...section, points: exam.pointsPerQuestion }))
@@ -35,7 +42,7 @@ function createRonExam({ language, label, direction, exams, sections, keyboard }
   const empty = () => ({ index: 0, answers: {}, submitted: false, checks: {} });
   const footer = () => '<footer>התשובות וההתקדמות נשמרות בדפדפן במכשיר הזה.</footer>';
   const isArabicText = value => /\p{Script=Arabic}/u.test(value);
-  const foreign = value => `<span dir="${direction}" lang="${arabic ? 'ar' : 'en'}">${esc(value)}</span>`;
+  const foreign = value => `<span dir="${direction}" lang="${literature ? 'he' : arabic ? 'ar' : 'en'}">${esc(value)}</span>`;
   const formatAnswer = value => arabic && !isArabicText(value) ? esc(value) : foreign(value);
   const numberLabel = number => 'מבחן ' + number;
   const examTrail = number => [...trail, [numberLabel(number)]];
@@ -83,7 +90,7 @@ function createRonExam({ language, label, direction, exams, sections, keyboard }
     if (question.kind === 'word' && response.meaning !== question.meaning) return 'wrong';
     if (question.kind === 'handwriting') return check === undefined ? 'pending' : check ? 'correct' : 'wrong';
     if (arabic) return response.text.trim().normalize('NFC') === question.answer.normalize('NFC') ? 'correct' : 'wrong';
-    if ([question.answer, ...(question.alternatives || [])].some(answer => normalize(answer) === normalize(response.text))) {
+    if (!question.manual && [question.answer, ...(question.alternatives || [])].some(answer => normalize(answer) === normalize(response.text))) {
       return 'correct';
     }
     if (!question.criteria) return 'wrong';
@@ -110,12 +117,14 @@ function createRonExam({ language, label, direction, exams, sections, keyboard }
     } else if (path === grade) {
       app.innerHTML = crumbs(trail.slice(0, 2)) + `<h1>כיתה ח׳</h1><p class="intro">בחרי מקצוע</p><div class="grid">${card('אנגלית', subject, 'הבנת הנקרא, אוצר מילים ודקדוק')}${card('ערבית', grade + '/arabic', 'זיהוי אותיות, כתיבה וניקוד')}</div>`;
     } else if (path === subject) {
-      app.innerHTML = crumbs(trail.slice(0, 3)) + `<h1>${label}</h1><div class="grid">${card('הכנה למבחן ' + label + ' נובמבר 26', menu, 'מבחני הכנה ברמת כיתה ח׳', exams.length + ' מבחני הכנה')}</div>`;
+      const heading = literature ? topic : 'הכנה למבחן ' + label + ' נובמבר 26';
+      app.innerHTML = crumbs(trail.slice(0, 3)) + `<h1>${label}</h1><div class="grid">${card(heading, menu, 'מבחני הכנה ברמת ' + gradeLabel, exams.length + ' מבחני הכנה')}</div>`;
     } else {
-      app.innerHTML = crumbs(trail) + `<div class="eyebrow">${label} · כיתה ח׳</div>
-        <h1>הכנה למבחן ${label} נובמבר 26</h1>
-        <p class="intro">${arabic ? 'תרגלי זיהוי אותיות, כתיבה וניקוד. הכיני מחברת לשאלות הכתיבה ביד.'
-          : 'שלושה מבחנים באותה רמה. בכל מבחן 30 שאלות בהבנת הנקרא, באוצר מילים ובדקדוק.'} התשובות והציון מופיעים אחרי ההגשה.</p>
+      app.innerHTML = crumbs(trail) + `<div class="eyebrow">${label} · ${gradeLabel}</div>
+        <h1>${literature ? topic : 'הכנה למבחן ' + label + ' נובמבר 26'}</h1>
+        <p class="intro">${intro || (arabic ? 'תרגלי זיהוי אותיות, כתיבה וניקוד. הכיני מחברת לשאלות הכתיבה ביד.'
+          : 'שלושה מבחנים באותה רמה. בכל מבחן 30 שאלות בהבנת הנקרא, באוצר מילים ובדקדוק.')} התשובות והציון מופיעים אחרי ההגשה.</p>
+        ${studyPath ? `<div class="actions"><a class="btn primary" href="${studyPath}">חימום אינטראקטיבי לפני המבחנים ←</a></div>` : ''}
         <div class="grid">${exams.map((exam, index) => {
           const number = index + 1;
           const attempt = load(number);
@@ -145,10 +154,10 @@ function createRonExam({ language, label, direction, exams, sections, keyboard }
   }
 
   function questionHtml(exam, question, response, bank) {
-    const promptDirection = arabic || question.kind === 'translation' ? '' : ' dir="ltr" lang="en"';
+    const promptDirection = literature || arabic || question.kind === 'translation' ? '' : ' dir="ltr" lang="en"';
     let input = '';
     if (question.options) {
-      input = optionsHtml(question.options, response.text, 'data-english-option', !arabic);
+      input = optionsHtml(question.options, response.text, 'data-english-option', !arabic && !literature);
     } else if (question.kind === 'handwriting') {
       input = `<label><input type="checkbox" id="arabic-written"${response.text ? ' checked' : ''}> כתבתי במחברת</label>`;
     } else if (arabic) {
@@ -157,11 +166,12 @@ function createRonExam({ language, label, direction, exams, sections, keyboard }
         ${arabicKeyboard(question, exam.letters)}`;
     } else {
       const long = Boolean(question.criteria);
-      const attributes = 'id="english-text" dir="ltr" lang="en" autocomplete="off" spellcheck="false" autocapitalize="off" autocorrect="off"';
-      const field = long ? `<textarea ${attributes} rows="3">${esc(response.text || '')}</textarea>`
+      const attributes = literature ? 'id="english-text" dir="rtl" lang="he"'
+        : 'id="english-text" dir="ltr" lang="en" autocomplete="off" spellcheck="false" autocapitalize="off" autocorrect="off"';
+      const field = long ? `<textarea ${attributes} rows="${question.kind === 'literatureEssay' ? 7 : 3}">${esc(response.text || '')}</textarea>`
         : `<input ${attributes} type="text" value="${esc(response.text || '')}">`;
       input = (question.kind === 'word' ? `<fieldset class="english-bank"><legend>בנק מילים בעברית</legend>${optionsHtml(bank, response.meaning, 'data-english-meaning', false)}</fieldset>` : '')
-        + `<label for="english-text">התשובה שלך באנגלית</label>${field}`;
+        + `<label for="english-text">התשובה שלך${literature ? '' : ' באנגלית'}</label>${field}`;
     }
 
     return `<section class="question" aria-labelledby="english-prompt">
@@ -335,7 +345,7 @@ function createRonExam({ language, label, direction, exams, sections, keyboard }
     const canCheck = question.criteria && (result === 'pending' || attempt.checks[index] !== undefined);
     return `<details data-english-result="${result}" data-english-review="${index}">
       <summary>${resultLabel(question, index, result)}</summary>
-      <p${arabic || question.kind === 'translation' ? '' : ' dir="ltr" lang="en"'}><strong>${esc(question.prompt)}</strong></p>
+      <p${literature || arabic || question.kind === 'translation' ? '' : ' dir="ltr" lang="en"'}><strong>${esc(question.prompt)}</strong></p>
       ${glyphHtml(question)}
       <p>התשובה שלך — ${response?.text?.trim() ? formatAnswer(response.text) : question.kind === 'handwriting' ? 'לא סומן שנכתבה תשובה במחברת' : 'לא הוקלדה תשובה'}${question.kind === 'word' ? ` · משמעות שבחרת — ${esc(response?.meaning || 'לא נבחרה')}` : ''}</p>
       <p>${question.criteria ? 'תשובה אפשרית' : 'התשובה הנכונה'} — <strong>${formatAnswer(question.answer)}</strong>${question.kind === 'word' ? ' · ' + esc(question.meaning) : ''}</p>
@@ -408,7 +418,7 @@ function createRonExam({ language, label, direction, exams, sections, keyboard }
   }
 
   function render(path) {
-    if ([subject, menu].includes(path) || (!arabic && [student, grade].includes(path))) {
+    if ([subject, menu].includes(path) || (!arabic && !literature && [student, grade].includes(path))) {
       renderPage(path);
       return true;
     }
@@ -423,7 +433,7 @@ function createRonExam({ language, label, direction, exams, sections, keyboard }
   return { render };
 }
 
-const RonEnglish = createRonExam({
+const RonEnglish = createStudyExam({
   language: 'english', label: 'אנגלית', direction: 'ltr', exams: ronEnglishExams,
   sections: [
     { key: 'reading', label: 'הבנת הנקרא', points: 3 },
@@ -431,7 +441,7 @@ const RonEnglish = createRonExam({
     { key: 'grammar', label: 'דקדוק', points: 3.5 },
   ],
 });
-const RonArabic = typeof ronArabicExams === 'undefined' ? null : createRonExam({
+const RonArabic = typeof ronArabicExams === 'undefined' ? null : createStudyExam({
   language: 'arabic', label: 'ערבית', direction: 'rtl', exams: ronArabicExams.exams,
   keyboard: ronArabicExams.keyboard,
   sections: [

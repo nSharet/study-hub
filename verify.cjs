@@ -198,3 +198,50 @@ for (const [i, exam] of arabic.exams.entries()) {
   assert.equal((app.innerHTML.match(/data-english-result="wrong"/g) || []).length, 1);
 }
 console.log('PASS: 4 Arabic exams, direct links, delayed feedback, exact vowel grading, handwritten self-check, and 100/100.');
+
+const literatureMenu = '#/adar/literature/catcher-in-the-rye';
+assert.match(renderAt('#/adar/literature'), /התפסן בשדה השיפון/);
+assert.equal((renderAt(literatureMenu).match(/\/exam-[123]/g) || []).length, 3);
+assert.match(app.innerHTML, /חימום אינטראקטיבי/);
+assert.equal((renderAt(literatureMenu + '/study').match(/<details>/g) || []).length, 6);
+assert.match(app.innerHTML, /בני תשובה על הקרוסלה/);
+
+const literature = vm.runInContext('catcherExams', ctx);
+const literaturePrompts = new Set();
+for (const [i, exam] of literature.entries()) {
+  assert.equal(exam.questions.length, 14);
+  assert.equal(exam.writing.length, 6);
+  assert.equal(exam.writing.filter(question => question.kind === 'literatureEssay').length, 2);
+  const questions = [...exam.questions, ...exam.writing];
+  for (const question of questions) {
+    assert(!literaturePrompts.has(question.prompt), question.prompt);
+    literaturePrompts.add(question.prompt);
+    if (question.options) {
+      assert(question.options.includes(question.answer));
+      assert.equal(new Set(question.options).size, 4);
+    } else {
+      assert(question.manual && question.criteria);
+    }
+  }
+  const number = i + 1;
+  const route = literatureMenu + '/exam-' + number;
+  const key = 'study-hub-adar-literature-catcher-in-the-rye-' + number;
+  assert.match(renderAt(route), /שאלה 1 מתוך 20/);
+  const attempt = {
+    index: 19, submitted: false, checks: {},
+    answers: Object.fromEntries(questions.map((question, index) => [index, { text: question.answer }])),
+  };
+  storage[key] = JSON.stringify(attempt);
+  assert.match(renderAt(route), /textarea[^>]+dir="rtl" lang="he" rows="7"/);
+  assert(!app.innerHTML.includes('מה צריך להופיע בתשובה'));
+  attempt.submitted = true;
+  storage[key] = JSON.stringify(attempt);
+  assert.match(renderAt(route), /70 \/ 100/);
+  assert.equal((app.innerHTML.match(/data-english-result="pending"/g) || []).length, 6);
+  attempt.checks = Object.fromEntries(exam.writing.map((_, index) => [index + 14, true]));
+  storage[key] = JSON.stringify(attempt);
+  assert.match(renderAt(route), /100 \/ 100/);
+  assert.match(app.innerHTML, /30 \/ 30/);
+}
+assert.equal(literaturePrompts.size, 60);
+console.log('PASS: three distinct Catcher in the Rye exams, Hebrew writing, warm-up route, delayed feedback and self-review.');
