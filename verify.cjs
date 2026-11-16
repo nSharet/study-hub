@@ -201,7 +201,7 @@ console.log('PASS: 4 Arabic exams, direct links, delayed feedback, exact vowel g
 
 const literatureMenu = '#/adar/literature/catcher-in-the-rye';
 assert.match(renderAt('#/adar/literature'), /התפסן בשדה השיפון/);
-assert.equal((renderAt(literatureMenu).match(/\/exam-[123]/g) || []).length, 3);
+assert.equal((renderAt(literatureMenu).match(/\/exam-[1234]/g) || []).length, 4);
 assert.match(app.innerHTML, /חימום אינטראקטיבי/);
 assert.equal((renderAt(literatureMenu + '/study').match(/<details>/g) || []).length, 6);
 assert.match(app.innerHTML, /בני תשובה על הקרוסלה/);
@@ -209,9 +209,10 @@ assert.match(app.innerHTML, /בני תשובה על הקרוסלה/);
 const literature = vm.runInContext('catcherExams', ctx);
 const literaturePrompts = new Set();
 for (const [i, exam] of literature.entries()) {
-  assert.equal(exam.questions.length, 14);
-  assert.equal(exam.writing.length, 6);
-  assert.equal(exam.writing.filter(question => question.kind === 'literatureEssay').length, 2);
+  const simulation = i === 3;
+  assert.equal(exam.questions.length, simulation ? 10 : 14);
+  assert.equal(exam.writing.length, simulation ? 10 : 6);
+  assert.equal(exam.writing.filter(question => question.kind === 'literatureEssay').length, simulation ? 4 : 2);
   const questions = [...exam.questions, ...exam.writing];
   for (const question of questions) {
     assert(!literaturePrompts.has(question.prompt), question.prompt);
@@ -236,12 +237,25 @@ for (const [i, exam] of literature.entries()) {
   assert(!app.innerHTML.includes('מה צריך להופיע בתשובה'));
   attempt.submitted = true;
   storage[key] = JSON.stringify(attempt);
-  assert.match(renderAt(route), /70 \/ 100/);
-  assert.equal((app.innerHTML.match(/data-english-result="pending"/g) || []).length, 6);
-  attempt.checks = Object.fromEntries(exam.writing.map((_, index) => [index + 14, true]));
+  assert(renderAt(route).includes((exam.questions.length * 5) + ' / 100'));
+  assert.equal((app.innerHTML.match(/data-english-result="pending"/g) || []).length, exam.writing.length);
+  if (simulation) {
+    assert(questions.every(question => Object.hasOwn(exam.reviewTopics, question.topic)));
+    assert.match(app.innerHTML, /מה לחזק אחרי המבחן/);
+    assert.match(app.innerHTML, /לבדיקה עצמית/);
+    const originalAnswers = { ...attempt.answers };
+    attempt.answers[0] = { text: questions[0].options[0] };
+    delete attempt.answers[2];
+    storage[key] = JSON.stringify(attempt);
+    assert.match(renderAt(route), /1 טעויות/);
+    assert.match(app.innerHTML, /1 ללא תשובה/);
+    assert.match(app.innerHTML, /data-review-jump="0"/);
+    attempt.answers = originalAnswers;
+  }
+  attempt.checks = Object.fromEntries(exam.writing.map((_, index) => [index + exam.questions.length, true]));
   storage[key] = JSON.stringify(attempt);
   assert.match(renderAt(route), /100 \/ 100/);
-  assert.match(app.innerHTML, /30 \/ 30/);
+  assert(app.innerHTML.includes((exam.writing.length * 5) + ' / ' + (exam.writing.length * 5)));
 }
-assert.equal(literaturePrompts.size, 60);
-console.log('PASS: three distinct Catcher in the Rye exams, Hebrew writing, warm-up route, delayed feedback and self-review.');
+assert.equal(literaturePrompts.size, 80);
+console.log('PASS: four distinct Catcher in the Rye exams, Hebrew writing, warm-up route, delayed feedback and self-review.');
